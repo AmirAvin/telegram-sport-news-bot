@@ -6,7 +6,5 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Test Runner
-        run: echo "GitHub Runner is working"
+      - run: echo "GitHub Runner is working"
