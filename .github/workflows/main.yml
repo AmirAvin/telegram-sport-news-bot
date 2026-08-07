@@ -1,12 +1,12 @@
 name: Football Bot Runner
 
-permissions:
-  contents: write
-
 on:
+  workflow_dispatch:
   schedule:
     - cron: "*/10 * * * *"
-  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   run-bot:
@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install packages
+      - name: Install requirements
         run: pip install -r requirements.txt
 
       - name: Run bot
@@ -30,11 +30,10 @@ jobs:
           CHANNEL: ${{ secrets.CHANNEL }}
         run: python bot.py
 
-      - name: Save sent news
+      - name: Save news file
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git add sent_news.json
-          git commit -m "Update sent news" || echo "No changes"
+          git commit -m "update news" || echo "no changes"
           git push
-ث
