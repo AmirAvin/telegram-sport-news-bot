@@ -29,11 +29,3 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHANNEL: ${{ secrets.CHANNEL }}
         run: python bot.py
-
-      - name: Save news file
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git add sent_news.json
-          git commit -m "update news" || echo "no changes"
-          git push
