@@ -1,0 +1,1 @@
+print("football bot ready")
