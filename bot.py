@@ -1,4 +1,5 @@
 import os
+import json
 import asyncio
 import feedparser
 from telegram import Bot
@@ -6,30 +7,69 @@ from telegram import Bot
 TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL")
 
-RSS_URL = "https://feeds.bbci.co.uk/sport/football/rss.xml"
+SOURCES = [
+    "https://www.varzesh3.com/rss",
+]
+
+FILE = "sent_news.json"
+
+
+def load_sent():
+    try:
+        with open(FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return set(data)
+    except Exception:
+        return set()
+
+
+def save_sent(sent):
+    with open(FILE, "w", encoding="utf-8") as f:
+        json.dump(list(sent), f, ensure_ascii=False, indent=2)
 
 
 async def main():
-    feed = feedparser.parse(RSS_URL)
+    sent = load_sent()
 
-    if not feed.entries:
-        print("No news found")
-        return
+    bot = Bot(token=TOKEN)
 
-    news = feed.entries[0]
+    try:
+        for source in SOURCES:
+            feed = feedparser.parse(source)
 
-    title = news.get("title", "خبر فوتبال")
-    link = news.get("link", "")
+            for item in feed.entries[:10]:
+                title = item.get("title", "").strip()
+                link = item.get("link", "").strip()
 
-    text = f"⚽️ {title}\n\n🔗 {link}"
+                if not title or not link:
+                    continue
 
-    async with Bot(token=TOKEN) as bot:
-        await bot.send_message(
-            chat_id=CHANNEL,
-            text=text
-        )
+                # جلوگیری از ارسال خبر تکراری
+                if link in sent:
+                    continue
 
-    print("NEWS SENT")
+                message = (
+                    f"⚽️ {title}\n\n"
+                    f"🔗 {link}"
+                )
+
+                await bot.send_message(
+                    chat_id=CHANNEL,
+                    text=message
+                )
+
+                sent.add(link)
+                save_sent(sent)
+
+                print("NEWS SENT:", title)
+
+                # فقط یک خبر جدید در هر اجرا
+                return
+
+        print("NO NEW NEWS")
+
+    finally:
+        await bot.shutdown()
 
 
 if __name__ == "__main__":
