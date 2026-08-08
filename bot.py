@@ -8,7 +8,12 @@ TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL")
 
 SOURCES = [
-    "https://www.varzesh3.com/rss",
+    "https://www.khabarvarzeshi.com/rss",
+    "https://www.khabarvarzeshi.com/rss/tp/1",
+    "https://www.khabarvarzeshi.com/rss/tp/119",
+    "https://www.khabarvarzeshi.com/rss/tp/63",
+    "https://www.khabarvarzeshi.com/rss/tp/145",
+    "https://www.khabarvarzeshi.com/rss/tp/157",
 ]
 
 FILE = "sent_news.json"
@@ -17,8 +22,7 @@ FILE = "sent_news.json"
 def load_sent():
     try:
         with open(FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return set(data)
+            return set(json.load(f))
     except Exception:
         return set()
 
@@ -31,9 +35,7 @@ def save_sent(sent):
 async def main():
     sent = load_sent()
 
-    bot = Bot(token=TOKEN)
-
-    try:
+    async with Bot(token=TOKEN) as bot:
         for source in SOURCES:
             feed = feedparser.parse(source)
 
@@ -44,7 +46,6 @@ async def main():
                 if not title or not link:
                     continue
 
-                # جلوگیری از ارسال خبر تکراری
                 if link in sent:
                     continue
 
@@ -62,14 +63,9 @@ async def main():
                 save_sent(sent)
 
                 print("NEWS SENT:", title)
-
-                # فقط یک خبر جدید در هر اجرا
                 return
 
-        print("NO NEW NEWS")
-
-    finally:
-        await bot.shutdown()
+    print("NO NEW NEWS")
 
 
 if __name__ == "__main__":
