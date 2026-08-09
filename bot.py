@@ -16,6 +16,8 @@ SOURCES = [
 
 FILE = "sent_news.json"
 
+FOOTER = "@ligebartar24"
+
 
 def load_sent():
     try:
@@ -159,7 +161,8 @@ async def main():
                 message = (
                     f"⚽️ {title}\n\n"
                     f"📝 {summary}\n\n"
-                    f"🔗 منبع: {link}"
+                    f"🔗 منبع: {link}\n\n"
+                    f"{FOOTER}"
                 )
 
                 print(
@@ -201,4 +204,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(
