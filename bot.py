@@ -192,6 +192,7 @@ async def main():
                         title
                     )
 
+
     if new_count == 0:
         print("NO NEW NEWS")
     else:
@@ -201,4 +202,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    aasyncio.run(main())
+    asyncio.run(main())
+`
