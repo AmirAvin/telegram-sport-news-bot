@@ -19,7 +19,7 @@ def load_sent():
     try:
         with open(FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return set(data)
+            return set(str(x) for x in data)
     except Exception:
         return set()
 
@@ -42,17 +42,20 @@ def clean_text(text):
 
 async def main():
     sent = load_sent()
+
+    print("SENT IDS:", sorted(sent))
+    print("CHECK 552592:", "552592" in sent)
+
     new_count = 0
 
     async with Bot(token=TOKEN) as bot:
-
         for source in SOURCES:
             feed = feedparser.parse(source)
 
             for item in feed.entries[:50]:
-
                 title = clean_text(item.get("title", ""))
                 link = item.get("link", "").strip()
+
                 summary = clean_text(
                     item.get("summary", "")
                     or item.get("description", "")
@@ -63,9 +66,8 @@ async def main():
 
                 news_id = get_news_id(link)
 
-                # جلوگیری از ارسال خبر تکراری
                 if news_id in sent:
-                    print("SKIPPED OLD NEWS:", title)
+                    print("SKIPPED OLD NEWS:", news_id, title)
                     continue
 
                 if not summary:
@@ -90,7 +92,7 @@ async def main():
 
                 new_count += 1
 
-                print("NEWS SENT:", title)
+                print("NEWS SENT:", news_id, title)
 
     if new_count == 0:
         print("NO NEW NEWS")
