@@ -65,6 +65,8 @@ async def send_message_safe(bot, message):
             await bot.send_message(
                 chat_id=CHANNEL,
                 text=message,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
                 read_timeout=30,
                 write_timeout=30,
                 connect_timeout=30,
@@ -157,10 +159,26 @@ async def main():
                 if len(summary) > 500:
                     summary = summary[:500] + "..."
 
+                # Escape HTML characters
+                safe_title = (
+                    title
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                )
+
+                safe_summary = (
+                    summary
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                )
+
+                # لینک کوتاه و قابل کلیک
                 message = (
-                    f"⚽️ {title}\n\n"
-                    f"📝 {summary}\n\n"
-                    f"🔗 منبع: {link}\n\n"
+                    f"⚽️ {safe_title}\n\n"
+                    f"📝 {safe_summary}\n\n"
+                    f'<a href="{link}">🔗 لینک خبر</a>\n\n'
                     f"{FOOTER}"
                 )
 
