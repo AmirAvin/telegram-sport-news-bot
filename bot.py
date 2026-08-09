@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import asyncio
 import feedparser
 from telegram import Bot
@@ -9,11 +10,6 @@ CHANNEL = os.getenv("CHANNEL")
 
 SOURCES = [
     "https://www.khabarvarzeshi.com/rss",
-    "https://www.khabarvarzeshi.com/rss/tp/1",
-    "https://www.khabarvarzeshi.com/rss/tp/119",
-    "https://www.khabarvarzeshi.com/rss/tp/63",
-    "https://www.khabarvarzeshi.com/rss/tp/145",
-    "https://www.khabarvarzeshi.com/rss/tp/157",
 ]
 
 FILE = "sent_news.json"
@@ -22,14 +18,22 @@ FILE = "sent_news.json"
 def load_sent():
     try:
         with open(FILE, "r", encoding="utf-8") as f:
-            return set(json.load(f))
+            data = json.load(f)
+            return set(data)
     except Exception:
         return set()
 
 
 def save_sent(sent):
     with open(FILE, "w", encoding="utf-8") as f:
-        json.dump(list(sent), f, ensure_ascii=False, indent=2)
+        json.dump(sorted(sent), f, ensure_ascii=False, indent=2)
+
+
+def get_news_id(link):
+    match = re.search(r"/news/(\d+)", link)
+    if match:
+        return match.group(1)
+    return link
 
 
 def clean_text(text):
@@ -41,18 +45,27 @@ async def main():
     new_count = 0
 
     async with Bot(token=TOKEN) as bot:
+
         for source in SOURCES:
             feed = feedparser.parse(source)
 
-            for item in feed.entries[:20]:
+            for item in feed.entries[:50]:
+
                 title = clean_text(item.get("title", ""))
                 link = item.get("link", "").strip()
-                summary = clean_text(item.get("summary", ""))
+                summary = clean_text(
+                    item.get("summary", "")
+                    or item.get("description", "")
+                )
 
                 if not title or not link:
                     continue
 
-                if link in sent:
+                news_id = get_news_id(link)
+
+                # جلوگیری از ارسال خبر تکراری
+                if news_id in sent:
+                    print("SKIPPED OLD NEWS:", title)
                     continue
 
                 if not summary:
@@ -72,8 +85,9 @@ async def main():
                     text=message
                 )
 
-                sent.add(link)
+                sent.add(news_id)
                 save_sent(sent)
+
                 new_count += 1
 
                 print("NEWS SENT:", title)
