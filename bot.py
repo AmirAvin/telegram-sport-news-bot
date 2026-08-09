@@ -22,10 +22,10 @@ def load_sent():
         with open(FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-            if isinstance(data, list):
-                return set(str(x) for x in data)
+        if isinstance(data, list):
+            return set(str(x) for x in data)
 
-            return set()
+        return set()
 
     except Exception as e:
         print("Could not load sent_news.json:", e)
@@ -67,7 +67,7 @@ async def send_message_safe(bot, message):
                 read_timeout=30,
                 write_timeout=30,
                 connect_timeout=30,
-                pool_timeout=30,
+                pool_timeout=30
             )
 
             return True
@@ -192,7 +192,6 @@ async def main():
                         title
                     )
 
-
     if new_count == 0:
         print("NO NEW NEWS")
     else:
@@ -203,4 +202,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-`
