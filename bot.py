@@ -32,6 +32,10 @@ def save_sent(sent):
         json.dump(list(sent), f, ensure_ascii=False, indent=2)
 
 
+def clean_text(text):
+    return " ".join(text.split())
+
+
 async def main():
     sent = load_sent()
 
@@ -40,8 +44,11 @@ async def main():
             feed = feedparser.parse(source)
 
             for item in feed.entries[:10]:
-                title = item.get("title", "").strip()
+                title = clean_text(item.get("title", ""))
                 link = item.get("link", "").strip()
+
+                summary = item.get("summary", "")
+                summary = clean_text(summary)
 
                 if not title or not link:
                     continue
@@ -49,9 +56,17 @@ async def main():
                 if link in sent:
                     continue
 
+                if not summary:
+                    summary = "جزئیات بیشتر این خبر را می‌توانید از لینک منبع مشاهده کنید."
+
+                # کوتاه کردن خلاصه
+                if len(summary) > 500:
+                    summary = summary[:500] + "..."
+
                 message = (
                     f"⚽️ {title}\n\n"
-                    f"🔗 {link}"
+                    f"📝 {summary}\n\n"
+                    f"🔗 منبع: {link}"
                 )
 
                 await bot.send_message(
