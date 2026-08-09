@@ -38,17 +38,16 @@ def clean_text(text):
 
 async def main():
     sent = load_sent()
+    new_count = 0
 
     async with Bot(token=TOKEN) as bot:
         for source in SOURCES:
             feed = feedparser.parse(source)
 
-            for item in feed.entries[:10]:
+            for item in feed.entries[:20]:
                 title = clean_text(item.get("title", ""))
                 link = item.get("link", "").strip()
-
-                summary = item.get("summary", "")
-                summary = clean_text(summary)
+                summary = clean_text(item.get("summary", ""))
 
                 if not title or not link:
                     continue
@@ -59,7 +58,6 @@ async def main():
                 if not summary:
                     summary = "جزئیات بیشتر این خبر را می‌توانید از لینک منبع مشاهده کنید."
 
-                # کوتاه کردن خلاصه
                 if len(summary) > 500:
                     summary = summary[:500] + "..."
 
@@ -76,11 +74,14 @@ async def main():
 
                 sent.add(link)
                 save_sent(sent)
+                new_count += 1
 
                 print("NEWS SENT:", title)
-                return
 
-    print("NO NEW NEWS")
+    if new_count == 0:
+        print("NO NEW NEWS")
+    else:
+        print(f"TOTAL NEW NEWS SENT: {new_count}")
 
 
 if __name__ == "__main__":
