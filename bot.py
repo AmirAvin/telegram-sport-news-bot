@@ -2,6 +2,7 @@ import os
 import json
 import re
 import asyncio
+import html
 import feedparser
 
 from telegram import Bot
@@ -59,7 +60,48 @@ def clean_text(text):
     return " ".join(str(text).split())
 
 
-async def send_message_safe(bot, message):
+def get_media_url(item):
+    # 1. RSS enclosure
+    for enclosure in item.get("enclosures", []):
+        url = enclosure.get("href") or enclosure.get("url")
+
+        if url:
+            return url
+
+    # 2. media_content
+    for media in item.get("media_content", []):
+        url = media.get("url")
+
+        if url:
+            return url
+
+    # 3. media_thumbnail
+    for media in item.get("media_thumbnail", []):
+        url = media.get("url")
+
+        if url:
+            return url
+
+    # 4. Search inside RSS HTML for an image
+    raw = (
+        item.get("summary", "")
+        or item.get("description", "")
+        or ""
+    )
+
+    match = re.search(
+        r'<img[^>]+src=["\']([^"\']+)["\']',
+        raw,
+        re.IGNORECASE
+    )
+
+    if match:
+        return match.group(1)
+
+    return None
+
+
+async def send_text(bot, message):
     for attempt in range(3):
         try:
             await bot.send_message(
@@ -89,7 +131,43 @@ async def send_message_safe(bot, message):
             return False
 
         except Exception as e:
-            print("Unexpected Telegram error:", e)
+            print("Unexpected error:", e)
+            return False
+
+    return False
+
+
+async def send_photo(bot, photo_url, caption):
+    for attempt in range(3):
+        try:
+            await bot.send_photo(
+                chat_id=CHANNEL,
+                photo=photo_url,
+                caption=caption,
+                parse_mode="HTML",
+                read_timeout=30,
+                write_timeout=30,
+                connect_timeout=30,
+                pool_timeout=30
+            )
+
+            return True
+
+        except (TimedOut, NetworkError) as e:
+            print(
+                f"Photo connection error "
+                f"(attempt {attempt + 1}/3): {e}"
+            )
+
+            if attempt < 2:
+                await asyncio.sleep(5)
+
+        except TelegramError as e:
+            print("Photo Telegram error:", e)
+            return False
+
+        except Exception as e:
+            print("Photo error:", e)
             return False
 
     return False
@@ -159,28 +237,19 @@ async def main():
                 if len(summary) > 500:
                     summary = summary[:500] + "..."
 
-                # Escape HTML characters
-                safe_title = (
-                    title
-                    .replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                )
+                safe_title = html.escape(title)
+                safe_summary = html.escape(summary)
 
-                safe_summary = (
-                    summary
-                    .replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                )
-
-                # لینک کوتاه و قابل کلیک
-                message = (
+                caption = (
                     f"⚽️ {safe_title}\n\n"
                     f"📝 {safe_summary}\n\n"
-                    f'<a href="{link}">🔗 لینک خبر</a>\n\n'
+                    f'<a href="{html.escape(link, quote=True)}">'
+                    f"🔗 لینک خبر"
+                    f"</a>\n\n"
                     f"{FOOTER}"
                 )
+
+                media_url = get_media_url(item)
 
                 print(
                     "TRYING TO SEND:",
@@ -188,10 +257,33 @@ async def main():
                     title
                 )
 
-                success = await send_message_safe(
-                    bot,
-                    message
-                )
+                success = False
+
+                # اگر RSS عکس داشت، ابتدا عکس را می‌فرستیم
+                if media_url:
+                    print(
+                        "MEDIA FOUND:",
+                        media_url
+                    )
+
+                    success = await send_photo(
+                        bot,
+                        media_url,
+                        caption
+                    )
+
+                    if not success:
+                        print(
+                            "MEDIA SEND FAILED - "
+                            "SENDING TEXT ONLY"
+                        )
+
+                # اگر عکس وجود نداشت یا ارسالش نشد
+                if not success:
+                    success = await send_text(
+                        bot,
+                        caption
+                    )
 
                 if success:
                     sent.add(news_id)
