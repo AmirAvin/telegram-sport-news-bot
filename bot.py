@@ -18,6 +18,8 @@ SOURCES = [
 FILE = "sent_news.json"
 FOOTER = "@ligebartar24"
 
+CHECK_INTERVAL = 600  # هر 10 دقیقه
+
 
 def load_sent():
     try:
@@ -61,28 +63,24 @@ def clean_text(text):
 
 
 def get_media_url(item):
-    # 1. RSS enclosure
     for enclosure in item.get("enclosures", []):
         url = enclosure.get("href") or enclosure.get("url")
 
         if url:
             return url
 
-    # 2. media_content
     for media in item.get("media_content", []):
         url = media.get("url")
 
         if url:
             return url
 
-    # 3. media_thumbnail
     for media in item.get("media_thumbnail", []):
         url = media.get("url")
 
         if url:
             return url
 
-    # 4. Search inside RSS HTML for an image
     raw = (
         item.get("summary", "")
         or item.get("description", "")
@@ -173,7 +171,129 @@ async def send_photo(bot, photo_url, caption):
     return False
 
 
+async def check_news(bot):
+    sent = load_sent()
+
+    print("Checking for new news...")
+
+    new_count = 0
+
+    for source in SOURCES:
+
+        try:
+            feed = feedparser.parse(source)
+
+        except Exception as e:
+            print("RSS error:", e)
+            continue
+
+        for item in feed.entries[:50]:
+
+            title = clean_text(
+                item.get("title", "")
+            )
+
+            link = item.get(
+                "link",
+                ""
+            ).strip()
+
+            summary = clean_text(
+                item.get("summary", "")
+                or item.get("description", "")
+            )
+
+            if not title or not link:
+                continue
+
+            news_id = get_news_id(link)
+
+            if news_id in sent:
+                print(
+                    "SKIPPED OLD NEWS:",
+                    news_id,
+                    title
+                )
+                continue
+
+            if not summary:
+                summary = (
+                    "جزئیات بیشتر این خبر را "
+                    "می‌توانید از لینک منبع مشاهده کنید."
+                )
+
+            if len(summary) > 500:
+                summary = summary[:500] + "..."
+
+            safe_title = html.escape(title)
+            safe_summary = html.escape(summary)
+            safe_link = html.escape(link, quote=True)
+
+            message = (
+                f"⚽️ {safe_title}\n\n"
+                f"📝 {safe_summary}\n\n"
+                f'<a href="{safe_link}">🔗 لینک خبر</a>\n\n'
+                f"{FOOTER}"
+            )
+
+            print(
+                "TRYING TO SEND:",
+                news_id,
+                title
+            )
+
+            media_url = get_media_url(item)
+
+            success = False
+
+            if media_url:
+                print(
+                    "MEDIA FOUND:",
+                    media_url
+                )
+
+                success = await send_photo(
+                    bot,
+                    media_url,
+                    message
+                )
+
+            if not success:
+                success = await send_text(
+                    bot,
+                    message
+                )
+
+            if success:
+                sent.add(news_id)
+                save_sent(sent)
+
+                new_count += 1
+
+                print(
+                    "NEWS SENT:",
+                    news_id,
+                    title
+                )
+
+            else:
+                print(
+                    "NEWS NOT SENT:",
+                    news_id,
+                    title
+                )
+
+    if new_count == 0:
+        print("NO NEW NEWS")
+
+    else:
+        print(
+            f"TOTAL NEW NEWS SENT: {new_count}"
+        )
+
+
 async def main():
+
     if not TOKEN:
         print("ERROR: BOT_TOKEN is missing")
         return
@@ -182,134 +302,29 @@ async def main():
         print("ERROR: CHANNEL is missing")
         return
 
-    sent = load_sent()
-
-    print("SENT IDS:", sorted(sent))
-
-    new_count = 0
+    print("Football Bot started.")
+    print("Checking news every 10 minutes.")
 
     async with Bot(token=TOKEN) as bot:
 
-        for source in SOURCES:
+        while True:
 
             try:
-                feed = feedparser.parse(source)
+                await check_news(bot)
 
             except Exception as e:
-                print("RSS error:", e)
-                continue
-
-            for item in feed.entries[:50]:
-
-                title = clean_text(
-                    item.get("title", "")
-                )
-
-                link = item.get(
-                    "link",
-                    ""
-                ).strip()
-
-                summary = clean_text(
-                    item.get("summary", "")
-                    or item.get("description", "")
-                )
-
-                if not title or not link:
-                    continue
-
-                news_id = get_news_id(link)
-
-                if news_id in sent:
-                    print(
-                        "SKIPPED OLD NEWS:",
-                        news_id,
-                        title
-                    )
-                    continue
-
-                if not summary:
-                    summary = (
-                        "جزئیات بیشتر این خبر را "
-                        "می‌توانید از لینک منبع مشاهده کنید."
-                    )
-
-                if len(summary) > 500:
-                    summary = summary[:500] + "..."
-
-                safe_title = html.escape(title)
-                safe_summary = html.escape(summary)
-
-                caption = (
-                    f"⚽️ {safe_title}\n\n"
-                    f"📝 {safe_summary}\n\n"
-                    f'<a href="{html.escape(link, quote=True)}">'
-                    f"🔗 لینک خبر"
-                    f"</a>\n\n"
-                    f"{FOOTER}"
-                )
-
-                media_url = get_media_url(item)
-
                 print(
-                    "TRYING TO SEND:",
-                    news_id,
-                    title
+                    "ERROR DURING NEWS CHECK:",
+                    e
                 )
 
-                success = False
+            print(
+                "Next check in 10 minutes..."
+            )
 
-                # اگر RSS عکس داشت، ابتدا عکس را می‌فرستیم
-                if media_url:
-                    print(
-                        "MEDIA FOUND:",
-                        media_url
-                    )
-
-                    success = await send_photo(
-                        bot,
-                        media_url,
-                        caption
-                    )
-
-                    if not success:
-                        print(
-                            "MEDIA SEND FAILED - "
-                            "SENDING TEXT ONLY"
-                        )
-
-                # اگر عکس وجود نداشت یا ارسالش نشد
-                if not success:
-                    success = await send_text(
-                        bot,
-                        caption
-                    )
-
-                if success:
-                    sent.add(news_id)
-                    save_sent(sent)
-
-                    new_count += 1
-
-                    print(
-                        "NEWS SENT:",
-                        news_id,
-                        title
-                    )
-
-                else:
-                    print(
-                        "NEWS NOT SENT:",
-                        news_id,
-                        title
-                    )
-
-    if new_count == 0:
-        print("NO NEW NEWS")
-    else:
-        print(
-            f"TOTAL NEW NEWS SENT: {new_count}"
-        )
+            await asyncio.sleep(
+                CHECK_INTERVAL
+            )
 
 
 if __name__ == "__main__":
