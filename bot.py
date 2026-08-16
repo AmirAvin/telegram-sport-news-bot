@@ -18,8 +18,6 @@ SOURCES = [
 FILE = "sent_news.json"
 FOOTER = "@ligebartar24"
 
-CHECK_INTERVAL = 600  # هر 10 دقیقه
-
 
 def load_sent():
     try:
@@ -59,7 +57,10 @@ def clean_text(text):
     if not text:
         return ""
 
-    return " ".join(str(text).split())
+    text = re.sub(r"<[^>]+>", " ", str(text))
+    text = html.unescape(text)
+
+    return " ".join(text.split())
 
 
 def get_media_url(item):
@@ -97,6 +98,23 @@ def get_media_url(item):
         return match.group(1)
 
     return None
+
+
+def is_video(url):
+    if not url:
+        return False
+
+    url = url.lower().split("?")[0]
+
+    video_extensions = (
+        ".mp4",
+        ".mov",
+        ".m4v",
+        ".webm",
+        ".avi"
+    )
+
+    return url.endswith(video_extensions)
 
 
 async def send_text(bot, message):
@@ -166,6 +184,42 @@ async def send_photo(bot, photo_url, caption):
 
         except Exception as e:
             print("Photo error:", e)
+            return False
+
+    return False
+
+
+async def send_video(bot, video_url, caption):
+    for attempt in range(3):
+        try:
+            await bot.send_video(
+                chat_id=CHANNEL,
+                video=video_url,
+                caption=caption,
+                parse_mode="HTML",
+                read_timeout=60,
+                write_timeout=60,
+                connect_timeout=30,
+                pool_timeout=30
+            )
+
+            return True
+
+        except (TimedOut, NetworkError) as e:
+            print(
+                f"Video connection error "
+                f"(attempt {attempt + 1}/3): {e}"
+            )
+
+            if attempt < 2:
+                await asyncio.sleep(5)
+
+        except TelegramError as e:
+            print("Video Telegram error:", e)
+            return False
+
+        except Exception as e:
+            print("Video error:", e)
             return False
 
     return False
@@ -247,25 +301,39 @@ async def check_news(bot):
             success = False
 
             if media_url:
+
                 print(
                     "MEDIA FOUND:",
                     media_url
                 )
 
-                success = await send_photo(
-                    bot,
-                    media_url,
-                    message
-                )
+                if is_video(media_url):
+
+                    success = await send_video(
+                        bot,
+                        media_url,
+                        message
+                    )
+
+                else:
+
+                    success = await send_photo(
+                        bot,
+                        media_url,
+                        message
+                    )
 
             if not success:
+
                 success = await send_text(
                     bot,
                     message
                 )
 
             if success:
+
                 sent.add(news_id)
+
                 save_sent(sent)
 
                 new_count += 1
@@ -277,6 +345,7 @@ async def check_news(bot):
                 )
 
             else:
+
                 print(
                     "NEWS NOT SENT:",
                     news_id,
@@ -284,9 +353,11 @@ async def check_news(bot):
                 )
 
     if new_count == 0:
+
         print("NO NEW NEWS")
 
     else:
+
         print(
             f"TOTAL NEW NEWS SENT: {new_count}"
         )
@@ -295,37 +366,33 @@ async def check_news(bot):
 async def main():
 
     if not TOKEN:
+
         print("ERROR: BOT_TOKEN is missing")
+
         return
 
     if not CHANNEL:
+
         print("ERROR: CHANNEL is missing")
+
         return
 
     print("Football Bot started.")
-    print("Checking news every 10 minutes.")
 
     async with Bot(token=TOKEN) as bot:
 
-        while True:
+        try:
 
-            try:
-                await check_news(bot)
+            await check_news(bot)
 
-            except Exception as e:
-                print(
-                    "ERROR DURING NEWS CHECK:",
-                    e
-                )
+        except Exception as e:
 
             print(
-                "Next check in 10 minutes..."
-            )
-
-            await asyncio.sleep(
-                CHECK_INTERVAL
+                "ERROR DURING NEWS CHECK:",
+                e
             )
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())
