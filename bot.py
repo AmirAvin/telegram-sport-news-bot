@@ -237,7 +237,6 @@ def create_hashtags(title, summary):
 
 def get_media_url(entry):
 
-    # 1 - media_content
     media_content = entry.get("media_content", [])
 
     if media_content:
@@ -249,7 +248,6 @@ def get_media_url(entry):
             if url:
                 return url
 
-    # 2 - media_thumbnail
     media_thumbnail = entry.get("media_thumbnail", [])
 
     if media_thumbnail:
@@ -261,7 +259,6 @@ def get_media_url(entry):
             if url:
                 return url
 
-    # 3 - enclosure
     enclosures = entry.get("enclosures", [])
 
     if enclosures:
@@ -273,7 +270,6 @@ def get_media_url(entry):
             if url:
                 return url
 
-    # 4 - لینک عکس داخل summary
     html = entry.get("summary", "")
 
     if html:
@@ -414,7 +410,7 @@ async def send_logo(bot):
             LOGO_FILE
         )
 
-        return
+        return False
 
     try:
 
@@ -428,7 +424,9 @@ async def send_logo(bot):
                 sticker=logo
             )
 
-        print("✅ LOGO SENT")
+        print("✅ LOGO SENT AS STICKER")
+
+        return True
 
     except Exception as e:
 
@@ -437,8 +435,6 @@ async def send_logo(bot):
             e
         )
 
-        # اگر فایل WEBP استیکر معتبر تلگرام نبود،
-        # به عنوان فایل ارسال می‌شود.
         try:
 
             with open(
@@ -455,12 +451,16 @@ async def send_logo(bot):
                 "✅ LOGO SENT AS DOCUMENT"
             )
 
+            return True
+
         except Exception as e2:
 
             print(
                 "❌ LOGO ERROR:",
                 e2
             )
+
+            return False
 
 
 # =========================
@@ -493,12 +493,7 @@ async def send_media(
             ""
         ).lower()
 
-        # تصویر
-        if (
-            content_type.startswith(
-                "image/"
-            )
-        ):
+        if content_type.startswith("image/"):
 
             await bot.send_photo(
                 chat_id=CHANNEL,
@@ -509,12 +504,7 @@ async def send_media(
 
             return True
 
-        # ویدئو
-        if (
-            content_type.startswith(
-                "video/"
-            )
-        ):
+        if content_type.startswith("video/"):
 
             await bot.send_video(
                 chat_id=CHANNEL,
@@ -584,7 +574,6 @@ async def main():
 
         link = news["link"]
 
-        # جلوگیری از تکراری
         if link in sent_news:
 
             print(
@@ -600,9 +589,17 @@ async def main():
 
         try:
 
-            # -------------------------
-            # ارسال خبر
-            # -------------------------
+            # =========================
+            # اول لوگو
+            # =========================
+
+            await send_logo(bot)
+
+            await asyncio.sleep(1)
+
+            # =========================
+            # بعد خبر
+            # =========================
 
             media_sent = await send_media(
                 bot,
@@ -619,13 +616,8 @@ async def main():
                     disable_web_page_preview=True
                 )
 
-            # -------------------------
-            # ارسال لوگو
-            # -------------------------
-
-            await send_logo(bot)
-
             # ذخیره خبر
+
             sent_news.append(link)
 
             save_sent_news(
