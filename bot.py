@@ -18,8 +18,6 @@ SENT_FILE = "sent_news.json"
 
 MAX_NEWS_PER_RUN = 10
 
-LOGO_FILE = "ligebartar_sticker.webp"
-
 FOOTBALL_KEYWORDS = [
     "فوتبال",
     "استقلال",
@@ -398,72 +396,6 @@ def create_message(news):
 
 
 # =========================
-# ارسال لوگو
-# =========================
-
-async def send_logo(bot):
-
-    if not os.path.exists(LOGO_FILE):
-
-        print(
-            "⚠️ فایل لوگو پیدا نشد:",
-            LOGO_FILE
-        )
-
-        return False
-
-    try:
-
-        with open(
-            LOGO_FILE,
-            "rb"
-        ) as logo:
-
-            await bot.send_sticker(
-                chat_id=CHANNEL,
-                sticker=logo
-            )
-
-        print("✅ LOGO SENT AS STICKER")
-
-        return True
-
-    except Exception as e:
-
-        print(
-            "⚠️ Sticker ارسال نشد:",
-            e
-        )
-
-        try:
-
-            with open(
-                LOGO_FILE,
-                "rb"
-            ) as logo:
-
-                await bot.send_document(
-                    chat_id=CHANNEL,
-                    document=logo
-                )
-
-            print(
-                "✅ LOGO SENT AS DOCUMENT"
-            )
-
-            return True
-
-        except Exception as e2:
-
-            print(
-                "❌ LOGO ERROR:",
-                e2
-            )
-
-            return False
-
-
-# =========================
 # ارسال رسانه
 # =========================
 
@@ -590,15 +522,8 @@ async def main():
         try:
 
             # =========================
-            # اول لوگو
-            # =========================
-
-            await send_logo(bot)
-
-            await asyncio.sleep(1)
-
-            # =========================
-            # بعد خبر
+            # ارسال خبر
+            # بدون ارسال استیکر
             # =========================
 
             media_sent = await send_media(
