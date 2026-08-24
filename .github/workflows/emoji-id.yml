@@ -1,27 +1,44 @@
-name: Get LigaBartar Custom Emoji ID
+name: Test LigaBartar Custom Emoji
 
 on:
   workflow_dispatch:
 
 jobs:
-  get-emoji-id:
+  test-custom-emoji:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get Custom Emoji ID
+      - name: Send Custom Emoji Test
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL: ${{ secrets.CHANNEL }}
         run: |
           python - <<'PY'
           import os
           import requests
 
           token = os.environ["BOT_TOKEN"]
+          channel = os.environ["CHANNEL"]
 
-          url = f"https://api.telegram.org/bot{token}/getStickerSet"
-          params = {"name": "LigaBartar24"}
+          emoji_id = "5791832221211959289"
 
-          response = requests.get(url, params=params, timeout=30)
+          text = (
+              '<tg-emoji emoji-id="'
+              + emoji_id
+              + '">⚽️</tg-emoji> @ligebartar24'
+          )
+
+          url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+          response = requests.post(
+              url,
+              data={
+                  "chat_id": channel,
+                  "text": text,
+                  "parse_mode": "HTML"
+              },
+              timeout=30
+          )
 
           print("STATUS:", response.status_code)
           print(response.text)
