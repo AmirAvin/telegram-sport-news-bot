@@ -19,25 +19,5 @@ jobs:
       - name: Run python
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
-          python - <<'PY'
-          import os
-          import requests
-
-          token = os.environ["BOT_TOKEN"]
-          channel_id = os.environ["CHANNEL_ID"]
-
-          r = requests.get(
-              f"https://api.telegram.org/bot{token}/getMe",
-              timeout=30
-          )
-
-          print("STATUS:", r.status_code)
-          print(r.text)
-
-          if r.status_code != 200:
-              raise SystemExit("Telegram connection failed")
-
-          print("Telegram connection OK")
-          P
+          python -c "import os; from telegram import Bot; import asyncio; bot=Bot(os.environ['BOT_TOKEN']); print(asyncio.run(bot.get_me()))
