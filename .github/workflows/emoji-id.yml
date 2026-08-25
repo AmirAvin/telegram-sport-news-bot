@@ -1,32 +1,38 @@
 name: Inspect Telegram Emoji
+
 on:
   workflow_dispatch:
+
 jobs:
   inspect:
     runs-on: ubuntu-latest
+
     steps:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+
       - name: Install Telegram library
-        run: |
-          pip install python-telegram-bot==20.8
+        run: pip install python-telegram-bot==20.8
+
       - name: Run python
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
-          python - <<'PY'
+          cat > test_telegram.py <<'PY'
           import os
-          import requests
-          token = os.environ["BOT_TOKEN"]
-          channel_id = os.environ["CHANNEL_ID"]
-          url = f"https://api.telegram.org/bot{token}/getMe"
-          r = requests.get(url, timeout=30)
-          print("STATUS:", r.status_code)
-          print(r.text)
-          if r.status_code != 200:
-              raise SystemExit("Telegram connection failed")
-          print("Telegram connection OK")
+          import asyncio
+          from telegram import Bot
+
+          async def main():
+              bot = Bot(token=os.environ["BOT_TOKEN"])
+              me = await bot.get_me()
+              print("BOT OK")
+              print("Username:", me.username)
+              print("ID:", me.id)
+
+          asyncio.run(main())
           PY
+
+          python test_telegram.py
