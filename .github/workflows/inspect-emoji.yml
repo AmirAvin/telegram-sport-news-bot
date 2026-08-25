@@ -14,72 +14,30 @@ jobs:
           python-version: "3.11"
 
       - name: Install Telegram library
-        run: |
-          pip install python-telegram-bot==20.8
+        run: pip install python-telegram-bot==20.8
 
-      - name: Create checker
+      - name: Run python
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
-          cat > emoji_checker.py <<'PY'
+          python - <<'PY'
           import os
-          import asyncio
-          from telegram import Bot
+          import requests
 
-          async def main():
-              bot = Bot(os.environ["BOT_TOKEN"])
+          token = os.environ["BOT_TOKEN"]
+          channel_id = os.environ["CHANNEL_ID"]
 
-              print("====================================")
-              print("Telegram Emoji Entity Checker")
-              print("====================================")
-              print("Waiting for forwarded message...")
+          r = requests.get(
+              f"https://api.telegram.org/bot{token}/getMe",
+              timeout=30
+          )
 
-              updates = await bot.get_updates(
-                  timeout=60,
-                  allowed_updates=["message"]
-              )
+          print("STATUS:", r.status_code)
+          print(r.text)
 
-              if not updates:
-                  print("NO_MESSAGE_RECEIVED")
-                  await bot.shutdown()
-                  return
+          if r.status_code != 200:
+              raise SystemExit("Telegram connection failed")
 
-              for update in updates:
-                  message = update.message
-
-                  if not message:
-                      continue
-
-                  print("\n====================================")
-                  print("MESSAGE ID:", message.message_id)
-                  print("CHAT ID:", message.chat.id)
-
-                  print("\nTEXT:")
-                  print(message.text or message.caption or "")
-
-                  print("\nMESSAGE ENTITIES:")
-
-                  for entity in (message.entities or []):
-                      print("------------------------------------")
-                      print("TYPE:", entity.type)
-                      print("OFFSET:", entity.offset)
-                      print("LENGTH:", entity.length)
-                      print("CUSTOM EMOJI ID:", entity.custom_emoji_id)
-                      print("URL:", entity.url)
-
-                  print("\nCAPTION ENTITIES:")
-
-                  for entity in (message.caption_entities or []):
-                      print("------------------------------------")
-                      print("TYPE:", entity.type)
-                      print("OFFSET:", entity.offset)
-                      print("LENGTH:", entity.length)
-                      print("CUSTOM EMOJI ID:", entity.custom_emoji_id)
-                      print("URL:", entity.url)
-
-              await bot.shutdown()
-
-          asyncio.run(main())
-          PY
-
-          python emoji_checker.py
+          print("Telegram connection OK")
+          P
