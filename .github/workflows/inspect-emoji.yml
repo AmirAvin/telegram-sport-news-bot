@@ -9,18 +9,19 @@ jobs:
 
     steps:
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - name: Install
-        run: pip install python-telegram-bot==20.8
+      - name: Install Telegram library
+        run: |
+          pip install python-telegram-bot==20.8
 
-      - name: Inspect messages
+      - name: Create checker
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          cat > inspect.py <<'PY'
+          cat > emoji_checker.py <<'PY'
           import os
           import asyncio
           from telegram import Bot
@@ -28,8 +29,10 @@ jobs:
           async def main():
               bot = Bot(os.environ["BOT_TOKEN"])
 
-              print("✅ ربات آماده دریافت پیام است.")
-              print("⏳ حالا پست نمونه را برای ربات Forward کن.")
+              print("====================================")
+              print("Telegram Emoji Entity Checker")
+              print("====================================")
+              print("Waiting for forwarded message...")
 
               updates = await bot.get_updates(
                   timeout=60,
@@ -37,7 +40,7 @@ jobs:
               )
 
               if not updates:
-                  print("❌ هیچ پیام جدیدی دریافت نشد.")
+                  print("NO_MESSAGE_RECEIVED")
                   return
 
               for update in updates:
@@ -46,35 +49,35 @@ jobs:
                   if not message:
                       continue
 
-                  print("\n==============================")
+                  print("\n====================================")
                   print("MESSAGE ID:", message.message_id)
-                  print("TEXT:", message.text or message.caption or "")
+                  print("CHAT ID:", message.chat.id)
+                  print("TEXT:")
+                  print(message.text or message.caption or "")
 
-                  print("\nENTITIES:")
+                  print("\nMESSAGE ENTITIES:")
 
                   for entity in (message.entities or []):
-                      print(
-                          "type =", entity.type,
-                          "| offset =", entity.offset,
-                          "| length =", entity.length,
-                          "| custom_emoji_id =", entity.custom_emoji_id,
-                          "| url =", entity.url
-                      )
+                      print("------------------------------------")
+                      print("TYPE:", entity.type)
+                      print("OFFSET:", entity.offset)
+                      print("LENGTH:", entity.length)
+                      print("CUSTOM EMOJI ID:", entity.custom_emoji_id)
+                      print("URL:", entity.url)
 
                   print("\nCAPTION ENTITIES:")
 
                   for entity in (message.caption_entities or []):
-                      print(
-                          "type =", entity.type,
-                          "| offset =", entity.offset,
-                          "| length =", entity.length,
-                          "| custom_emoji_id =", entity.custom_emoji_id,
-                          "| url =", entity.url
-                      )
+                      print("------------------------------------")
+                      print("TYPE:", entity.type)
+                      print("OFFSET:", entity.offset)
+                      print("LENGTH:", entity.length)
+                      print("CUSTOM EMOJI ID:", entity.custom_emoji_id)
+                      print("URL:", entity.url)
 
-                  print("==============================")
+                  print("====================================")
 
           asyncio.run(main())
           PY
 
-          python inspect.py
+          python emoji_checker.py
