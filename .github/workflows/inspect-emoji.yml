@@ -41,6 +41,7 @@ jobs:
 
               if not updates:
                   print("NO_MESSAGE_RECEIVED")
+                  await bot.shutdown()
                   return
 
               for update in updates:
@@ -52,7 +53,8 @@ jobs:
                   print("\n====================================")
                   print("MESSAGE ID:", message.message_id)
                   print("CHAT ID:", message.chat.id)
-                  print("TEXT:")
+
+                  print("\nTEXT:")
                   print(message.text or message.caption or "")
 
                   print("\nMESSAGE ENTITIES:")
@@ -75,7 +77,7 @@ jobs:
                       print("CUSTOM EMOJI ID:", entity.custom_emoji_id)
                       print("URL:", entity.url)
 
-                  print("====================================")
+              await bot.shutdown()
 
           asyncio.run(main())
           PY
