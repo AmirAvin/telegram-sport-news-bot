@@ -7,7 +7,7 @@ on:
 
 jobs:
   run-bot:
-    runs-on: runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -28,3 +28,4 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: python bot_new.py
+`
