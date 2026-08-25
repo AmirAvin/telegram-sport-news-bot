@@ -1,48 +1,32 @@
-name: Test LigaBartar Custom Emoji
-
+name: Inspect Telegram Emoji
 on:
   workflow_dispatch:
-
 jobs:
-  test-custom-emoji:
+  inspect:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Send Custom Emoji Test
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install Telegram library
+        run: |
+          pip install python-telegram-bot==20.8
+      - name: Run python
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL: ${{ secrets.CHANNEL }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
           python - <<'PY'
           import os
           import requests
-
           token = os.environ["BOT_TOKEN"]
-          channel = os.environ["CHANNEL"]
-
-          emoji_id = "5791832221211959289"
-
-          url = f"https://api.telegram.org/bot{token}/sendMessage"
-
-          payload = {
-              "chat_id": channel,
-              "text": "🏆 @ligebartar24",
-              "entities": [
-                  {
-                      "type": "custom_emoji",
-                      "offset": 0,
-                      "length": 2,
-                      "custom_emoji_id": emoji_id
-                  }
-              ]
-          }
-
-          response = requests.post(
-              url,
-              json=payload,
-              timeout=30
-          )
-
-          print("STATUS:", response.status_code)
-          print(response.text)
+          channel_id = os.environ["CHANNEL_ID"]
+          url = f"https://api.telegram.org/bot{token}/getMe"
+          r = requests.get(url, timeout=30)
+          print("STATUS:", r.status_code)
+          print(r.text)
+          if r.status_code != 200:
+              raise SystemExit("Telegram connection failed")
+          print("Telegram connection OK")
           PY
