@@ -1,7 +1,7 @@
 import requests
 import re
 
-URL = "https://www.aparat.com/video/video/embed/videohash/mxh0449/vt/frame?recom=self"
+URL = "https://www.aparat.com/v/mxh0449"
 
 HEADERS = {
     "User-Agent": (
@@ -9,14 +9,18 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept": (
+        "text/html,application/xhtml+xml,"
+        "application/xml;q=0.9,image/avif,"
+        "image/webp,*/*;q=0.8"
+    ),
     "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
 
 def main():
 
-    print("OPENING APARAT:")
+    print("OPENING APARAT VIDEO:")
     print(URL)
 
     try:
@@ -29,10 +33,12 @@ def main():
 
         print("STATUS:", response.status_code)
         print("FINAL URL:", response.url)
+
         print(
             "CONTENT TYPE:",
             response.headers.get("content-type")
         )
+
         print(
             "HTML LENGTH:",
             len(response.text)
@@ -40,16 +46,17 @@ def main():
 
         html = response.text
 
-        print("\n=== VIDEO URL SEARCH ===")
+        print("\n=== MP4 SEARCH ===")
+
+        found = set()
 
         patterns = [
             r'https?://[^"\']+\.mp4[^"\']*',
-            r'https?://[^"\']+\.m3u8[^"\']*',
-            r'https?://[^"\']+\.webm[^"\']*',
-            r'https?://[^"\']+\.m4v[^"\']*',
+            r'https?:\\?/\\?/[^"\']+\.mp4[^"\']*',
+            r'"url"\s*:\s*"([^"]+)"',
+            r'"src"\s*:\s*"([^"]+)"',
+            r'"file"\s*:\s*"([^"]+)"',
         ]
-
-        found = set()
 
         for pattern in patterns:
 
@@ -59,45 +66,62 @@ def main():
                 re.IGNORECASE
             )
 
-            for url in matches:
+            for match in matches:
 
-                url = url.replace(
+                if isinstance(match, tuple):
+                    match = match[0]
+
+                url = match.replace(
                     "\\/",
                     "/"
                 )
 
-                if url not in found:
+                if (
+                    "mp4" in url.lower()
+                    or "video" in url.lower()
+                    or "cdn" in url.lower()
+                ):
 
-                    found.add(url)
+                    if url not in found:
 
-                    print(
-                        "VIDEO URL:",
-                        url[:1500]
-                    )
+                        found.add(url)
 
-        print("\n=== APARAT DATA ===")
+                        print(
+                            "FOUND:",
+                            url[:2000]
+                        )
+
+        print("\n=== IMPORTANT WORDS ===")
 
         for keyword in [
-            "file",
             "video",
-            "videoUrl",
+            "file",
+            "src",
+            "url",
+            "cdn",
+            "stream",
+            "quality",
             "360",
             "480",
             "720",
             "1080",
-            "src",
-            "cdn"
+            "m3u8",
+            "mp4"
         ]:
-
-            count = html.lower().count(
-                keyword.lower()
-            )
 
             print(
                 keyword,
                 "=>",
-                count
+                html.lower().count(
+                    keyword.lower()
+                )
             )
+
+        print("\n=== HTML PREVIEW ===")
+
+        print(
+            html[:3000]
+        )
 
         print("\n=== FINISHED ===")
 
