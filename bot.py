@@ -73,7 +73,7 @@ FOOTBALL_KEYWORDS = [
 
 
 # =========================
-# کلمات هشتگ
+# هشتگ‌ها
 # =========================
 
 HASHTAG_KEYWORDS = [
@@ -310,7 +310,6 @@ def create_hashtags(
 
 def get_media_url(entry):
 
-    # media_content
     media_content = entry.get(
         "media_content",
         []
@@ -325,7 +324,6 @@ def get_media_url(entry):
             if url:
                 return url
 
-    # media_thumbnail
     media_thumbnail = entry.get(
         "media_thumbnail",
         []
@@ -340,7 +338,6 @@ def get_media_url(entry):
             if url:
                 return url
 
-    # enclosures
     enclosures = entry.get(
         "enclosures",
         []
@@ -358,7 +355,6 @@ def get_media_url(entry):
             if url:
                 return url
 
-    # summary HTML
     html = entry.get(
         "summary",
         ""
@@ -371,7 +367,6 @@ def get_media_url(entry):
             "html.parser"
         )
 
-        # img
         image = soup.find("img")
 
         if image:
@@ -385,6 +380,77 @@ def get_media_url(entry):
                 return src
 
     return None
+
+
+# =========================
+# تشخیص URL ویدیو
+# =========================
+
+def is_probable_video_url(url):
+
+    if not url:
+        return False
+
+    url_lower = url.lower()
+
+    video_extensions = [
+        ".mp4",
+        ".m4v",
+        ".mov",
+        ".webm",
+        ".avi",
+        ".mkv"
+    ]
+
+    for extension in video_extensions:
+
+        if extension in url_lower:
+            return True
+
+    video_words = [
+        "/video/",
+        "/videos/",
+        "video_url",
+        "video-url",
+        "videourl",
+        "mp4"
+    ]
+
+    for word in video_words:
+
+        if word in url_lower:
+            return True
+
+    return False
+
+
+# =========================
+# تبدیل URL نسبی به کامل
+# =========================
+
+def make_absolute_url(
+    base_url,
+    url
+):
+
+    if not url:
+        return None
+
+    if url.startswith("//"):
+        return "https:" + url
+
+    if url.startswith("http://"):
+        return url
+
+    if url.startswith("https://"):
+        return url
+
+    from urllib.parse import urljoin
+
+    return urljoin(
+        base_url,
+        url
+    )
 
 
 # =========================
@@ -407,6 +473,11 @@ def get_video_url(
             allow_redirects=True
         )
 
+        print(
+            "ARTICLE STATUS:",
+            response.status_code
+        )
+
         response.raise_for_status()
 
         content_type = response.headers.get(
@@ -414,8 +485,14 @@ def get_video_url(
             ""
         ).lower()
 
-        # اگر خود URL مستقیماً ویدیو بود
+        print(
+            "ARTICLE CONTENT TYPE:",
+            content_type
+        )
+
+        # اگر خود URL ویدیو بود
         if content_type.startswith("video/"):
+
             return response.url
 
         soup = BeautifulSoup(
@@ -424,7 +501,7 @@ def get_video_url(
         )
 
         # =========================
-        # og:video
+        # OG VIDEO
         # =========================
 
         og_video_names = [
@@ -455,14 +532,26 @@ def get_video_url(
 
                 url = tag.get("content")
 
-                if url and is_probable_video_url(url):
-                    return make_absolute_url(
+                if url:
+
+                    url = make_absolute_url(
                         article_url,
                         url
                     )
 
+                    if is_probable_video_url(
+                        url
+                    ):
+
+                        print(
+                            "VIDEO FOUND IN OG:",
+                            url
+                        )
+
+                        return url
+
         # =========================
-        # video tag
+        # VIDEO TAG
         # =========================
 
         videos = soup.find_all(
@@ -497,19 +586,30 @@ def get_video_url(
                 )
 
                 if src:
-                    candidates.append(src)
+                    candidates.append(
+                        src
+                    )
 
             for url in candidates:
 
-                if is_probable_video_url(url):
+                url = make_absolute_url(
+                    article_url,
+                    url
+                )
 
-                    return make_absolute_url(
-                        article_url,
+                if is_probable_video_url(
+                    url
+                ):
+
+                    print(
+                        "VIDEO FOUND IN VIDEO TAG:",
                         url
                     )
 
+                    return url
+
         # =========================
-        # source tag
+        # SOURCE TAG
         # =========================
 
         sources = soup.find_all(
@@ -523,15 +623,26 @@ def get_video_url(
                 or source.get("data-src")
             )
 
-            if url and is_probable_video_url(url):
+            if url:
 
-                return make_absolute_url(
+                url = make_absolute_url(
                     article_url,
                     url
                 )
 
+                if is_probable_video_url(
+                    url
+                ):
+
+                    print(
+                        "VIDEO FOUND IN SOURCE:",
+                        url
+                    )
+
+                    return url
+
         # =========================
-        # لینک مستقیم ویدیو
+        # لینک‌های مستقیم ویدیو
         # =========================
 
         for link in soup.find_all(
@@ -541,12 +652,23 @@ def get_video_url(
 
             url = link.get("href")
 
-            if url and is_probable_video_url(url):
+            if url:
 
-                return make_absolute_url(
+                url = make_absolute_url(
                     article_url,
                     url
                 )
+
+                if is_probable_video_url(
+                    url
+                ):
+
+                    print(
+                        "VIDEO FOUND IN LINK:",
+                        url
+                    )
+
+                    return url
 
     except Exception as e:
 
@@ -555,86 +677,11 @@ def get_video_url(
             e
         )
 
-    return None
-
-
-# =========================
-# تشخیص URL ویدیو
-# =========================
-
-def is_probable_video_url(
-    url
-):
-
-    if not url:
-        return False
-
-    url_lower = url.lower()
-
-    video_extensions = [
-        ".mp4",
-        ".m4v",
-        ".mov",
-        ".webm",
-        ".avi",
-        ".mkv"
-    ]
-
-    for extension in video_extensions:
-
-        if extension in url_lower:
-            return True
-
-    # بعضی CDNها پسوند ندارند
-    video_words = [
-        "/video/",
-        "/videos/",
-        "video_url",
-        "video-url",
-        "videourl",
-        "mp4"
-    ]
-
-    for word in video_words:
-
-        if word in url_lower:
-            return True
-
-    return False
-
-
-# =========================
-# تبدیل URL نسبی به کامل
-# =========================
-
-def make_absolute_url(
-    base_url,
-    url
-):
-
-    if not url:
-        return None
-
-    if url.startswith(
-        "//"
-    ):
-
-        return "https:" + url
-
-    if url.startswith(
-        "http://"
-    ) or url.startswith(
-        "https://"
-    ):
-
-        return url
-
-    from urllib.parse import urljoin
-
-    return urljoin(
-        base_url,
-        url
+    print(
+        "VIDEO NOT FOUND"
     )
+
+    return None
 
 
 # =========================
@@ -757,7 +804,7 @@ def create_message(
 
 
 # =========================
-# دانلود و ارسال رسانه
+# ارسال رسانه
 # =========================
 
 async def send_media(
@@ -838,8 +885,7 @@ async def send_media(
             return True
 
         # =========================
-        # اگر Content-Type درست نبود
-        # ولی URL شبیه ویدیو بود
+        # URL شبیه ویدیو
         # =========================
 
         if is_probable_video_url(
@@ -935,12 +981,17 @@ async def main():
         try:
 
             # =========================
-            # اول تلاش برای پیدا کردن ویدیو
+            # بررسی صفحه خبر
             # =========================
 
             print(
                 "CHECKING VIDEO:",
                 news["title"]
+            )
+
+            print(
+                "ARTICLE URL:",
+                link
             )
 
             video_url = get_video_url(
@@ -974,7 +1025,7 @@ async def main():
 
             # =========================
             # اگر ویدیو ارسال نشد
-            # از رسانه RSS استفاده کن
+            # عکس RSS
             # =========================
 
             if not media_sent:
@@ -996,8 +1047,7 @@ async def main():
                     )
 
             # =========================
-            # اگر هیچ رسانه‌ای نبود
-            # فقط متن
+            # اگر رسانه نبود
             # =========================
 
             if not media_sent:
