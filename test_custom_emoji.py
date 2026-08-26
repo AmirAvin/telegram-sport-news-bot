@@ -1,6 +1,9 @@
 import os
 import asyncio
 from telegram import Bot
+from telegram.constants import MessageEntityType
+from telegram import MessageEntity
+
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHANNEL_ID = os.environ["CHANNEL_ID"]
@@ -11,15 +14,21 @@ CUSTOM_EMOJI_ID = "5791832221211959289"
 async def main():
     bot = Bot(token=BOT_TOKEN)
 
-    text = (
-        f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">🏆</tg-emoji> '
-        'تست بررسی Custom Emoji'
-    )
+    text = "🏆 تست Custom Emoji با Entity"
+
+    entities = [
+        MessageEntity(
+            type=MessageEntityType.CUSTOM_EMOJI,
+            offset=0,
+            length=2,
+            custom_emoji_id=CUSTOM_EMOJI_ID,
+        )
+    ]
 
     message = await bot.send_message(
         chat_id=CHANNEL_ID,
         text=text,
-        parse_mode="HTML"
+        entities=entities,
     )
 
     print("MESSAGE SENT")
