@@ -9,12 +9,11 @@ CUSTOM_EMOJI_ID = "5791832221211959289"
 
 
 async def main():
-
     bot = Bot(token=BOT_TOKEN)
 
     text = (
         f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">🏆</tg-emoji> '
-        'تست لوگوی لیگ‌برتر @ligebartar24'
+        'تست بررسی Custom Emoji'
     )
 
     message = await bot.send_message(
@@ -25,6 +24,7 @@ async def main():
 
     print("MESSAGE SENT")
     print("Message ID:", message.message_id)
+    print("Message entities:", message.entities)
 
     await bot.shutdown()
 
