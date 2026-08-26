@@ -4,8 +4,10 @@ import re
 import asyncio
 import feedparser
 import requests
+
 from bs4 import BeautifulSoup
 from telegram import Bot
+
 
 # =========================
 # تنظیمات
@@ -17,6 +19,21 @@ CHANNEL = os.getenv("CHANNEL")
 SENT_FILE = "sent_news.json"
 
 MAX_NEWS_PER_RUN = 10
+
+REQUEST_TIMEOUT = 20
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0 Safari/537.36"
+    )
+}
+
+
+# =========================
+# کلمات فوتبال
+# =========================
 
 FOOTBALL_KEYWORDS = [
     "فوتبال",
@@ -53,6 +70,11 @@ FOOTBALL_KEYWORDS = [
     "یوونتوس",
     "پاری سن ژرمن",
 ]
+
+
+# =========================
+# کلمات هشتگ
+# =========================
 
 HASHTAG_KEYWORDS = [
     "استقلال",
@@ -94,6 +116,11 @@ HASHTAG_KEYWORDS = [
     "فوتبال اروپا",
 ]
 
+
+# =========================
+# منابع RSS
+# =========================
+
 RSS_SOURCES = [
     "https://www.isna.ir/rss",
     "https://www.khabarvarzeshi.com/rss",
@@ -107,11 +134,18 @@ RSS_SOURCES = [
 # =========================
 
 def load_sent_news():
+
     if not os.path.exists(SENT_FILE):
         return []
 
     try:
-        with open(SENT_FILE, "r", encoding="utf-8") as f:
+
+        with open(
+            SENT_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             data = json.load(f)
 
         if isinstance(data, list):
@@ -120,11 +154,18 @@ def load_sent_news():
         return []
 
     except Exception:
+
         return []
 
 
 def save_sent_news(sent_news):
-    with open(SENT_FILE, "w", encoding="utf-8") as f:
+
+    with open(
+        SENT_FILE,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
         json.dump(
             sent_news[-1000:],
             f,
@@ -138,14 +179,25 @@ def save_sent_news(sent_news):
 # =========================
 
 def clean_text(text):
+
     if not text:
         return ""
 
-    soup = BeautifulSoup(text, "html.parser")
+    soup = BeautifulSoup(
+        text,
+        "html.parser"
+    )
 
-    text = soup.get_text(" ", strip=True)
+    text = soup.get_text(
+        " ",
+        strip=True
+    )
 
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
 
     return text.strip()
 
@@ -154,7 +206,10 @@ def clean_text(text):
 # کوتاه کردن متن
 # =========================
 
-def shorten_text(text, max_length=700):
+def shorten_text(
+    text,
+    max_length=700
+):
 
     text = clean_text(text)
 
@@ -178,9 +233,14 @@ def shorten_text(text, max_length=700):
 # تشخیص خبر فوتبالی
 # =========================
 
-def is_football_news(title, summary):
+def is_football_news(
+    title,
+    summary
+):
 
-    text = f"{title} {summary}".lower()
+    text = (
+        f"{title} {summary}"
+    ).lower()
 
     for keyword in FOOTBALL_KEYWORDS:
 
@@ -194,9 +254,14 @@ def is_football_news(title, summary):
 # ساخت هشتگ
 # =========================
 
-def create_hashtags(title, summary):
+def create_hashtags(
+    title,
+    summary
+):
 
-    text = f"{title} {summary}"
+    text = (
+        f"{title} {summary}"
+    )
 
     found = []
 
@@ -210,7 +275,13 @@ def create_hashtags(title, summary):
 
         if keyword.lower() in text.lower():
 
-            hashtag = "#" + keyword.replace(" ", "_")
+            hashtag = (
+                "#" +
+                keyword.replace(
+                    " ",
+                    "_"
+                )
+            )
 
             if hashtag not in found:
                 found.append(hashtag)
@@ -219,23 +290,31 @@ def create_hashtags(title, summary):
             break
 
     if len(found) < 3:
+
         if "#فوتبال" not in found:
             found.append("#فوتبال")
 
     if len(found) < 3:
+
         if "#اخبار_فوتبال" not in found:
             found.append("#اخبار_فوتبال")
 
-    return " ".join(found[:5])
+    return " ".join(
+        found[:5]
+    )
 
 
 # =========================
-# پیدا کردن رسانه خبر
+# پیدا کردن رسانه در RSS
 # =========================
 
 def get_media_url(entry):
 
-    media_content = entry.get("media_content", [])
+    # media_content
+    media_content = entry.get(
+        "media_content",
+        []
+    )
 
     if media_content:
 
@@ -246,7 +325,11 @@ def get_media_url(entry):
             if url:
                 return url
 
-    media_thumbnail = entry.get("media_thumbnail", [])
+    # media_thumbnail
+    media_thumbnail = entry.get(
+        "media_thumbnail",
+        []
+    )
 
     if media_thumbnail:
 
@@ -257,18 +340,29 @@ def get_media_url(entry):
             if url:
                 return url
 
-    enclosures = entry.get("enclosures", [])
+    # enclosures
+    enclosures = entry.get(
+        "enclosures",
+        []
+    )
 
     if enclosures:
 
         for enclosure in enclosures:
 
-            url = enclosure.get("href") or enclosure.get("url")
+            url = (
+                enclosure.get("href")
+                or enclosure.get("url")
+            )
 
             if url:
                 return url
 
-    html = entry.get("summary", "")
+    # summary HTML
+    html = entry.get(
+        "summary",
+        ""
+    )
 
     if html:
 
@@ -277,16 +371,270 @@ def get_media_url(entry):
             "html.parser"
         )
 
+        # img
         image = soup.find("img")
 
         if image:
 
-            src = image.get("src")
+            src = (
+                image.get("src")
+                or image.get("data-src")
+            )
 
             if src:
                 return src
 
     return None
+
+
+# =========================
+# پیدا کردن ویدیو از صفحه خبر
+# =========================
+
+def get_video_url(
+    article_url
+):
+
+    if not article_url:
+        return None
+
+    try:
+
+        response = requests.get(
+            article_url,
+            timeout=REQUEST_TIMEOUT,
+            headers=HEADERS,
+            allow_redirects=True
+        )
+
+        response.raise_for_status()
+
+        content_type = response.headers.get(
+            "content-type",
+            ""
+        ).lower()
+
+        # اگر خود URL مستقیماً ویدیو بود
+        if content_type.startswith("video/"):
+            return response.url
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
+
+        # =========================
+        # og:video
+        # =========================
+
+        og_video_names = [
+            "og:video",
+            "og:video:url",
+            "og:video:secure_url"
+        ]
+
+        for name in og_video_names:
+
+            tag = soup.find(
+                "meta",
+                attrs={
+                    "property": name
+                }
+            )
+
+            if not tag:
+
+                tag = soup.find(
+                    "meta",
+                    attrs={
+                        "name": name
+                    }
+                )
+
+            if tag:
+
+                url = tag.get("content")
+
+                if url and is_probable_video_url(url):
+                    return make_absolute_url(
+                        article_url,
+                        url
+                    )
+
+        # =========================
+        # video tag
+        # =========================
+
+        videos = soup.find_all(
+            "video"
+        )
+
+        for video in videos:
+
+            candidates = []
+
+            src = video.get("src")
+
+            if src:
+                candidates.append(src)
+
+            data_src = video.get(
+                "data-src"
+            )
+
+            if data_src:
+                candidates.append(
+                    data_src
+                )
+
+            for source in video.find_all(
+                "source"
+            ):
+
+                src = (
+                    source.get("src")
+                    or source.get("data-src")
+                )
+
+                if src:
+                    candidates.append(src)
+
+            for url in candidates:
+
+                if is_probable_video_url(url):
+
+                    return make_absolute_url(
+                        article_url,
+                        url
+                    )
+
+        # =========================
+        # source tag
+        # =========================
+
+        sources = soup.find_all(
+            "source"
+        )
+
+        for source in sources:
+
+            url = (
+                source.get("src")
+                or source.get("data-src")
+            )
+
+            if url and is_probable_video_url(url):
+
+                return make_absolute_url(
+                    article_url,
+                    url
+                )
+
+        # =========================
+        # لینک مستقیم ویدیو
+        # =========================
+
+        for link in soup.find_all(
+            "a",
+            href=True
+        ):
+
+            url = link.get("href")
+
+            if url and is_probable_video_url(url):
+
+                return make_absolute_url(
+                    article_url,
+                    url
+                )
+
+    except Exception as e:
+
+        print(
+            "VIDEO PAGE ERROR:",
+            e
+        )
+
+    return None
+
+
+# =========================
+# تشخیص URL ویدیو
+# =========================
+
+def is_probable_video_url(
+    url
+):
+
+    if not url:
+        return False
+
+    url_lower = url.lower()
+
+    video_extensions = [
+        ".mp4",
+        ".m4v",
+        ".mov",
+        ".webm",
+        ".avi",
+        ".mkv"
+    ]
+
+    for extension in video_extensions:
+
+        if extension in url_lower:
+            return True
+
+    # بعضی CDNها پسوند ندارند
+    video_words = [
+        "/video/",
+        "/videos/",
+        "video_url",
+        "video-url",
+        "videourl",
+        "mp4"
+    ]
+
+    for word in video_words:
+
+        if word in url_lower:
+            return True
+
+    return False
+
+
+# =========================
+# تبدیل URL نسبی به کامل
+# =========================
+
+def make_absolute_url(
+    base_url,
+    url
+):
+
+    if not url:
+        return None
+
+    if url.startswith(
+        "//"
+    ):
+
+        return "https:" + url
+
+    if url.startswith(
+        "http://"
+    ) or url.startswith(
+        "https://"
+    ):
+
+        return url
+
+    from urllib.parse import urljoin
+
+    return urljoin(
+        base_url,
+        url
+    )
 
 
 # =========================
@@ -301,12 +649,15 @@ def get_news():
 
         try:
 
+            print(
+                "READING RSS:",
+                rss_url
+            )
+
             response = requests.get(
                 rss_url,
                 timeout=15,
-                headers={
-                    "User-Agent": "Mozilla/5.0"
-                }
+                headers=HEADERS
             )
 
             response.raise_for_status()
@@ -318,11 +669,17 @@ def get_news():
             for entry in feed.entries:
 
                 title = clean_text(
-                    entry.get("title", "")
+                    entry.get(
+                        "title",
+                        ""
+                    )
                 )
 
                 summary = clean_text(
-                    entry.get("summary", "")
+                    entry.get(
+                        "summary",
+                        ""
+                    )
                 )
 
                 link = entry.get(
@@ -353,7 +710,8 @@ def get_news():
         except Exception as e:
 
             print(
-                f"RSS ERROR: {rss_url}"
+                "RSS ERROR:",
+                rss_url
             )
 
             print(e)
@@ -365,7 +723,9 @@ def get_news():
 # ساخت متن خبر
 # =========================
 
-def create_message(news):
+def create_message(
+    news
+):
 
     title = news["title"]
 
@@ -383,6 +743,7 @@ def create_message(news):
     )
 
     if summary:
+
         message += (
             f"{summary}\n\n"
         )
@@ -396,7 +757,7 @@ def create_message(news):
 
 
 # =========================
-# ارسال رسانه
+# دانلود و ارسال رسانه
 # =========================
 
 async def send_media(
@@ -410,12 +771,15 @@ async def send_media(
 
     try:
 
+        print(
+            "MEDIA URL:",
+            media_url
+        )
+
         response = requests.get(
             media_url,
-            timeout=20,
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            }
+            timeout=REQUEST_TIMEOUT,
+            headers=HEADERS
         )
 
         response.raise_for_status()
@@ -425,7 +789,18 @@ async def send_media(
             ""
         ).lower()
 
-        if content_type.startswith("image/"):
+        print(
+            "MEDIA CONTENT TYPE:",
+            content_type
+        )
+
+        # =========================
+        # عکس
+        # =========================
+
+        if content_type.startswith(
+            "image/"
+        ):
 
             await bot.send_photo(
                 chat_id=CHANNEL,
@@ -434,15 +809,53 @@ async def send_media(
                 parse_mode="HTML"
             )
 
+            print(
+                "PHOTO SENT"
+            )
+
             return True
 
-        if content_type.startswith("video/"):
+        # =========================
+        # ویدیو
+        # =========================
+
+        if content_type.startswith(
+            "video/"
+        ):
 
             await bot.send_video(
                 chat_id=CHANNEL,
                 video=response.content,
                 caption=caption,
-                parse_mode="HTML"
+                parse_mode="HTML",
+                supports_streaming=True
+            )
+
+            print(
+                "VIDEO SENT"
+            )
+
+            return True
+
+        # =========================
+        # اگر Content-Type درست نبود
+        # ولی URL شبیه ویدیو بود
+        # =========================
+
+        if is_probable_video_url(
+            media_url
+        ):
+
+            await bot.send_video(
+                chat_id=CHANNEL,
+                video=response.content,
+                caption=caption,
+                parse_mode="HTML",
+                supports_streaming=True
+            )
+
+            print(
+                "VIDEO SENT BY URL"
             )
 
             return True
@@ -482,15 +895,15 @@ async def main():
     sent_news = load_sent_news()
 
     print(
-        f"تعداد اخبار ارسال شده قبلی: "
-        f"{len(sent_news)}"
+        "تعداد اخبار ارسال شده قبلی:",
+        len(sent_news)
     )
 
     news_list = get_news()
 
     print(
-        f"تعداد اخبار فوتبالی پیدا شده: "
-        f"{len(news_list)}"
+        "تعداد اخبار فوتبالی پیدا شده:",
+        len(news_list)
     )
 
     bot = Bot(
@@ -522,17 +935,76 @@ async def main():
         try:
 
             # =========================
-            # ارسال خبر
-            # بدون ارسال استیکر
+            # اول تلاش برای پیدا کردن ویدیو
             # =========================
 
-            media_sent = await send_media(
-                bot,
-                news.get("media_url"),
-                message
+            print(
+                "CHECKING VIDEO:",
+                news["title"]
             )
 
+            video_url = get_video_url(
+                link
+            )
+
+            media_sent = False
+
+            # =========================
+            # اگر ویدیو پیدا شد
+            # =========================
+
+            if video_url:
+
+                print(
+                    "VIDEO FOUND:",
+                    video_url
+                )
+
+                media_sent = await send_media(
+                    bot,
+                    video_url,
+                    message
+                )
+
+                if media_sent:
+
+                    print(
+                        "VIDEO NEWS SENT"
+                    )
+
+            # =========================
+            # اگر ویدیو ارسال نشد
+            # از رسانه RSS استفاده کن
+            # =========================
+
             if not media_sent:
+
+                rss_media = news.get(
+                    "media_url"
+                )
+
+                if rss_media:
+
+                    print(
+                        "USING RSS MEDIA"
+                    )
+
+                    media_sent = await send_media(
+                        bot,
+                        rss_media,
+                        message
+                    )
+
+            # =========================
+            # اگر هیچ رسانه‌ای نبود
+            # فقط متن
+            # =========================
+
+            if not media_sent:
+
+                print(
+                    "NO MEDIA - SENDING TEXT"
+                )
 
                 await bot.send_message(
                     chat_id=CHANNEL,
@@ -541,9 +1013,13 @@ async def main():
                     disable_web_page_preview=True
                 )
 
+            # =========================
             # ذخیره خبر
+            # =========================
 
-            sent_news.append(link)
+            sent_news.append(
+                link
+            )
 
             save_sent_news(
                 sent_news
@@ -556,7 +1032,9 @@ async def main():
                 news["title"]
             )
 
-            await asyncio.sleep(2)
+            await asyncio.sleep(
+                2
+            )
 
         except Exception as e:
 
@@ -567,8 +1045,9 @@ async def main():
             print(e)
 
     print(
-        f"✅ اجرای ربات تمام شد. "
-        f"{sent_count} خبر ارسال شد."
+        "✅ اجرای ربات تمام شد.",
+        sent_count,
+        "خبر ارسال شد."
     )
 
 
