@@ -1,7 +1,7 @@
 import requests
 import re
 
-URL = "https://www.khabarvarzeshi.com/news/554650/"
+URL = "https://www.aparat.com/video/video/embed/videohash/mxh0449/vt/frame?recom=self"
 
 HEADERS = {
     "User-Agent": (
@@ -16,80 +16,97 @@ HEADERS = {
 
 def main():
 
-    print("OPENING:", URL)
+    print("OPENING APARAT:")
+    print(URL)
 
-    response = requests.get(
-        URL,
-        headers=HEADERS,
-        timeout=30
-    )
+    try:
 
-    print("STATUS:", response.status_code)
-    print("FINAL URL:", response.url)
-    print("CONTENT TYPE:", response.headers.get("content-type"))
-    print("HTML LENGTH:", len(response.text))
+        response = requests.get(
+            URL,
+            headers=HEADERS,
+            timeout=30
+        )
 
-    html = response.text
-
-    print("\n=== VIDEO WORDS ===")
-
-    for word in [
-        ".mp4",
-        ".m3u8",
-        "video",
-        "videoUrl",
-        "video_url",
-        "video-url",
-        "player",
-        "source",
-        "iframe",
-        "jwplayer",
-        "aparat"
-    ]:
-
-        count = html.lower().count(word.lower())
-
+        print("STATUS:", response.status_code)
+        print("FINAL URL:", response.url)
         print(
-            word,
-            "=>",
-            count
+            "CONTENT TYPE:",
+            response.headers.get("content-type")
+        )
+        print(
+            "HTML LENGTH:",
+            len(response.text)
         )
 
-    print("\n=== MEDIA URLS ===")
+        html = response.text
 
-    patterns = [
-        r'https?://[^"\']+\.mp4[^"\']*',
-        r'https?://[^"\']+\.m3u8[^"\']*',
-        r'https?://[^"\']+video[^"\']*',
-        r'https?://[^"\']+player[^"\']*',
-    ]
+        print("\n=== VIDEO URL SEARCH ===")
 
-    found = set()
+        patterns = [
+            r'https?://[^"\']+\.mp4[^"\']*',
+            r'https?://[^"\']+\.m3u8[^"\']*',
+            r'https?://[^"\']+\.webm[^"\']*',
+            r'https?://[^"\']+\.m4v[^"\']*',
+        ]
 
-    for pattern in patterns:
+        found = set()
 
-        matches = re.findall(
-            pattern,
-            html,
-            re.IGNORECASE
-        )
+        for pattern in patterns:
 
-        for url in matches:
-
-            url = url.replace(
-                "\\/",
-                "/"
+            matches = re.findall(
+                pattern,
+                html,
+                re.IGNORECASE
             )
 
-            if url not in found:
+            for url in matches:
 
-                found.add(url)
-
-                print(
-                    url[:1000]
+                url = url.replace(
+                    "\\/",
+                    "/"
                 )
 
-    print("\n=== FINISHED ===")
+                if url not in found:
+
+                    found.add(url)
+
+                    print(
+                        "VIDEO URL:",
+                        url[:1500]
+                    )
+
+        print("\n=== APARAT DATA ===")
+
+        for keyword in [
+            "file",
+            "video",
+            "videoUrl",
+            "360",
+            "480",
+            "720",
+            "1080",
+            "src",
+            "cdn"
+        ]:
+
+            count = html.lower().count(
+                keyword.lower()
+            )
+
+            print(
+                keyword,
+                "=>",
+                count
+            )
+
+        print("\n=== FINISHED ===")
+
+    except Exception as e:
+
+        print(
+            "ERROR:",
+            e
+        )
 
 
 if __name__ == "__main__":
