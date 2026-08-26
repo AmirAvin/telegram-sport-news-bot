@@ -9,22 +9,23 @@ CUSTOM_EMOJI_ID = "5791832221211959289"
 
 
 async def main():
-
     bot = Bot(token=BOT_TOKEN)
 
-    text = (
-        f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">🏆</tg-emoji> '
-        'تست لوگوی لیگ‌برتر @ligebartar24'
-    )
+    print("CHANNEL_ID starts with -100:", CHANNEL_ID.startswith("-100"))
+    print("CHANNEL_ID length:", len(CHANNEL_ID))
 
-    message = await bot.send_message(
-        chat_id=CHANNEL_ID,
-        text=text,
-        parse_mode="HTML"
-    )
+    try:
+        chat = await bot.get_chat(chat_id=CHANNEL_ID)
 
-    print("MESSAGE SENT")
-    print("Message ID:", message.message_id)
+        print("CHAT FOUND")
+        print("Chat ID:", chat.id)
+        print("Chat type:", chat.type)
+        print("Chat username:", chat.username)
+
+    except Exception as e:
+        print("GET CHAT FAILED")
+        print(type(e).__name__)
+        print(str(e))
 
     await bot.shutdown()
 
