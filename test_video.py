@@ -1,8 +1,13 @@
 import requests
-import re
 import json
 
-URL = "https://www.aparat.com/v/mxh0449"
+VIDEO_HASH = "mxh0449"
+
+URLS = [
+    f"https://www.aparat.com/api/video/v1/video/show/videohash/{VIDEO_HASH}",
+    f"https://www.aparat.com/api/fa/v1/video/video/show/videohash/{VIDEO_HASH}",
+    f"https://www.aparat.com/api/video/v1/video/show/{VIDEO_HASH}",
+]
 
 HEADERS = {
     "User-Agent": (
@@ -10,126 +15,69 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept": "application/json,text/plain,*/*",
+    "Referer": f"https://www.aparat.com/v/{VIDEO_HASH}",
 }
 
 
 def main():
 
-    print("OPENING APARAT:")
-    print(URL)
+    print("=== APARAT API TEST ===")
+    print("VIDEO HASH:", VIDEO_HASH)
 
-    try:
+    for url in URLS:
 
-        response = requests.get(
-            URL,
-            headers=HEADERS,
-            timeout=30
-        )
+        print("\n--------------------------------")
+        print("REQUEST:")
+        print(url)
 
-        print("STATUS:", response.status_code)
-        print("HTML LENGTH:", len(response.text))
+        try:
 
-        html = response.text
+            response = requests.get(
+                url,
+                headers=HEADERS,
+                timeout=30
+            )
 
-        print("\n=== SEARCH VIDEO DATA ===")
-
-        keywords = [
-            "video",
-            "stream",
-            "cdn",
-            "file",
-            "url",
-            "quality",
-            "video_id",
-            "videoId",
-            "videoHash",
-            "hash"
-        ]
-
-        for keyword in keywords:
+            print("STATUS:", response.status_code)
+            print(
+                "CONTENT TYPE:",
+                response.headers.get("content-type")
+            )
 
             print(
-                keyword,
-                "=>",
-                html.lower().count(
-                    keyword.lower()
-                )
+                "RESPONSE LENGTH:",
+                len(response.text)
             )
 
-        print("\n=== JSON-LIKE DATA ===")
+            print("\nRESPONSE:")
 
-        patterns = [
-            r'"video[^"]*"\s*:\s*"[^"]+"',
-            r'"stream[^"]*"\s*:\s*"[^"]+"',
-            r'"cdn[^"]*"\s*:\s*"[^"]+"',
-            r'"file[^"]*"\s*:\s*"[^"]+"',
-            r'"url"\s*:\s*"[^"]+"',
-            r'"src"\s*:\s*"[^"]+"',
-        ]
+            try:
 
-        found = set()
-
-        for pattern in patterns:
-
-            matches = re.findall(
-                pattern,
-                html,
-                re.IGNORECASE
-            )
-
-            for item in matches:
-
-                item = item.replace(
-                    "\\/",
-                    "/"
-                )
-
-                if item not in found:
-
-                    found.add(item)
-
-                    print(
-                        item[:2000]
-                    )
-
-        print("\n=== APARAT CDN LINKS ===")
-
-        urls = re.findall(
-            r'https?://[^"\']+',
-            html
-        )
-
-        for url in urls:
-
-            url = url.replace(
-                "\\/",
-                "/"
-            )
-
-            if any(
-                word in url.lower()
-                for word in [
-                    "cdn",
-                    "video",
-                    "stream",
-                    "aparat"
-                ]
-            ):
+                data = response.json()
 
                 print(
-                    url[:2000]
+                    json.dumps(
+                        data,
+                        ensure_ascii=False,
+                        indent=2
+                    )[:10000]
                 )
 
-        print("\n=== FINISHED ===")
+            except Exception:
 
-    except Exception as e:
+                print(
+                    response.text[:5000]
+                )
 
-        print(
-            "ERROR:",
-            e
-        )
+        except Exception as e:
+
+            print(
+                "ERROR:",
+                e
+            )
+
+    print("\n=== FINISHED ===")
 
 
 if __name__ == "__main__":
