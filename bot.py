@@ -7,6 +7,7 @@ import requests
 
 from bs4 import BeautifulSoup
 from telegram import Bot
+from urllib.parse import urljoin
 
 
 # =========================
@@ -15,10 +16,10 @@ from telegram import Bot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# پشتیبانی از هر دو نام
+# برای سازگاری با نسخه فعلی
 CHANNEL = (
-    os.getenv("CHANNEL_ID")
-    or os.getenv("CHANNEL")
+    os.getenv("CHANNEL")
+    or os.getenv("CHANNEL_ID")
 )
 
 SENT_FILE = "sent_news.json"
@@ -404,7 +405,8 @@ def is_probable_video_url(url):
         ".mov",
         ".webm",
         ".avi",
-        ".mkv"
+        ".mkv",
+        ".apt"
     ]
 
     for extension in video_extensions:
@@ -418,7 +420,8 @@ def is_probable_video_url(url):
         "video_url",
         "video-url",
         "videourl",
-        "mp4"
+        "mp4",
+        "m3u8"
     ]
 
     for word in video_words:
@@ -430,7 +433,7 @@ def is_probable_video_url(url):
 
 
 # =========================
-# تبدیل URL نسبی به کامل
+# URL کامل
 # =========================
 
 def make_absolute_url(
@@ -450,104 +453,45 @@ def make_absolute_url(
     if url.startswith("https://"):
         return url
 
-    from urllib.parse import urljoin
-
     return urljoin(
         base_url,
         url
     )
 
 
-# ==========================================================
-# پیدا کردن Video Hash آپارات از صفحه خبر
-# ==========================================================
+# =========================
+# استخراج videohash آپارات
+# =========================
 
-def find_aparat_hash_from_html(
-    html
-):
+def extract_aparat_hash(url):
 
-    if not html:
+    if not url:
         return None
 
-    # روش اول: videohash
     patterns = [
         r"videohash/([A-Za-z0-9_-]+)",
-        r"videohash%2F([A-Za-z0-9_-]+)",
-        r"/v/([A-Za-z0-9_-]+)",
         r"aparat\.com/v/([A-Za-z0-9_-]+)",
+        r"aparat\.com/video/([A-Za-z0-9_-]+)",
+        r"uid/([A-Za-z0-9_-]+)"
     ]
 
     for pattern in patterns:
 
         match = re.search(
             pattern,
-            html,
+            url,
             re.IGNORECASE
         )
 
         if match:
-
-            video_hash = match.group(1)
-
-            if video_hash:
-
-                print(
-                    "APARAT HASH FOUND:",
-                    video_hash
-                )
-
-                return video_hash
-
-    # روش دوم: بررسی iframe
-    soup = BeautifulSoup(
-        html,
-        "html.parser"
-    )
-
-    for iframe in soup.find_all(
-        "iframe"
-    ):
-
-        src = (
-            iframe.get("src")
-            or iframe.get("data-src")
-            or ""
-        )
-
-        if "aparat.com" in src.lower():
-
-            print(
-                "APARAT IFRAME:",
-                src
-            )
-
-            for pattern in patterns:
-
-                match = re.search(
-                    pattern,
-                    src,
-                    re.IGNORECASE
-                )
-
-                if match:
-
-                    video_hash = match.group(1)
-
-                    if video_hash:
-
-                        print(
-                            "APARAT HASH FOUND FROM IFRAME:",
-                            video_hash
-                        )
-
-                        return video_hash
+            return match.group(1)
 
     return None
 
 
-# ==========================================================
-# دریافت لینک MP4 از API آپارات
-# ==========================================================
+# =========================
+# API آپارات
+# =========================
 
 def get_aparat_video_url(
     video_hash
@@ -562,12 +506,12 @@ def get_aparat_video_url(
         f"videohash/{video_hash}"
     )
 
-    print(
-        "APARAT API:",
-        api_url
-    )
-
     try:
+
+        print(
+            "APARAT API:",
+            api_url
+        )
 
         response = requests.get(
             api_url,
@@ -580,7 +524,8 @@ def get_aparat_video_url(
             response.status_code
         )
 
-        response.raise_for_status()
+        if response.status_code != 200:
+            return None
 
         data = response.json()
 
@@ -590,79 +535,80 @@ def get_aparat_video_url(
             .get("attributes", {})
         )
 
-        # =========================
-        # روش اول: file_link_all
-        # =========================
+        # -------------------------
+        # لینک‌های MP4
+        # -------------------------
 
         file_links = attributes.get(
             "file_link_all",
             []
         )
 
-        best_url = None
-
-        best_quality = 0
+        candidates = []
 
         for item in file_links:
 
-            profile = str(
-                item.get(
-                    "profile",
-                    ""
-                )
-            ).lower()
+            profile = item.get(
+                "profile",
+                ""
+            )
 
             urls = item.get(
                 "urls",
                 []
             )
 
-            if not urls:
-                continue
+            for url in urls:
 
-            url = urls[0]
+                if url:
 
-            # کیفیت را از profile استخراج می‌کنیم
-            quality_match = re.search(
-                r"(\d+)",
-                profile
-            )
+                    candidates.append({
+                        "profile": profile,
+                        "url": url
+                    })
 
-            if quality_match:
+        if candidates:
 
-                quality = int(
-                    quality_match.group(1)
+            # کیفیت را ترجیحاً 240 یا بالاتر انتخاب کن
+            def quality_number(item):
+
+                match = re.search(
+                    r"(\d+)",
+                    item.get(
+                        "profile",
+                        ""
+                    )
                 )
 
-            else:
+                if match:
+                    return int(
+                        match.group(1)
+                    )
 
-                quality = 0
+                return 0
 
-            print(
-                "APARAT FILE:",
-                profile,
-                url
+            candidates.sort(
+                key=quality_number,
+                reverse=True
             )
 
-            # کیفیت ترجیحی:
-            # 240p یا بالاتر
-            if quality > best_quality:
-
-                best_quality = quality
-                best_url = url
-
-        if best_url:
+            selected = candidates[0]
 
             print(
-                "APARAT MP4 SELECTED:",
-                best_url
+                "APARAT MP4 FOUND:",
+                selected["profile"]
             )
 
-            return best_url
+            print(
+                "APARAT VIDEO URL:",
+                selected["url"]
+            )
 
-        # =========================
-        # روش دوم: file_link
-        # =========================
+            return selected["url"]
+
+        # -------------------------
+        # اگر MP4 نبود، file_link
+        # -------------------------
 
         file_link = attributes.get(
             "file_link"
@@ -671,11 +617,12 @@ def get_aparat_video_url(
         if file_link:
 
             print(
-                "APARAT FILE LINK:",
-                file_link
+                "APARAT FILE LINK FOUND"
             )
 
             return file_link
+
+        return None
 
     except Exception as e:
 
@@ -684,20 +631,19 @@ def get_aparat_video_url(
             e
         )
 
-    print(
-        "APARAT VIDEO URL NOT FOUND"
-    )
-
-    return None
+        return None
 
 
-# ==========================================================
-# پیدا کردن ویدیو آپارات از صفحه خبر
-# ==========================================================
+# =========================
+# پیدا کردن ویدیوی آپارات
+# =========================
 
-def get_aparat_video_from_article(
+def find_aparat_video(
     article_url
 ):
+
+    if not article_url:
+        return None
 
     try:
 
@@ -708,45 +654,147 @@ def get_aparat_video_from_article(
             allow_redirects=True
         )
 
-        print(
-            "ARTICLE STATUS:",
-            response.status_code
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
         )
 
-        response.raise_for_status()
+        # -------------------------
+        # تمام لینک‌های صفحه
+        # -------------------------
+
+        all_urls = []
+
+        for tag in soup.find_all(
+            True
+        ):
+
+            for attr in [
+                "href",
+                "src",
+                "data-src",
+                "data-url"
+            ]:
+
+                value = tag.get(
+                    attr
+                )
+
+                if value:
+                    all_urls.append(
+                        make_absolute_url(
+                            article_url,
+                            value
+                        )
+                    )
+
+        # -------------------------
+        # iframe ها
+        # -------------------------
+
+        for iframe in soup.find_all(
+            "iframe"
+        ):
+
+            src = iframe.get("src")
+
+            if src:
+
+                all_urls.append(
+                    make_absolute_url(
+                        article_url,
+                        src
+                    )
+                )
+
+        # -------------------------
+        # متن HTML
+        # -------------------------
 
         html = response.text
 
-        video_hash = find_aparat_hash_from_html(
-            html
+        aparat_patterns = re.findall(
+            r'https?://(?:www\.)?aparat\.com/[^\s"\'<>]+',
+            html,
+            re.IGNORECASE
         )
 
-        if not video_hash:
+        all_urls.extend(
+            aparat_patterns
+        )
 
-            print(
-                "APARAT HASH NOT FOUND"
+        # -------------------------
+        # پیدا کردن Hash
+        # -------------------------
+
+        video_hash = None
+
+        for url in all_urls:
+
+            if not url:
+                continue
+
+            if "aparat.com" not in url.lower():
+                continue
+
+            video_hash = extract_aparat_hash(
+                url
             )
 
-            return None
+            if video_hash:
+                break
 
-        video_url = get_aparat_video_url(
-            video_hash
+        # -------------------------
+        # اگر Hash پیدا شد
+        # -------------------------
+
+        if video_hash:
+
+            print(
+                "APARAT VIDEO HASH:",
+                video_hash
+            )
+
+            video_url = get_aparat_video_url(
+                video_hash
+            )
+
+            if video_url:
+                return video_url
+
+        # -------------------------
+        # جستجوی مستقیم MP4
+        # -------------------------
+
+        mp4_matches = re.findall(
+            r'https?://[^"\']+\.mp4[^"\']*',
+            html,
+            re.IGNORECASE
         )
 
-        return video_url
+        for url in mp4_matches:
+
+            print(
+                "DIRECT MP4 FOUND:",
+                url
+            )
+
+            return url
 
     except Exception as e:
 
         print(
-            "APARAT ARTICLE ERROR:",
+            "APARAT SEARCH ERROR:",
             e
         )
 
-        return None
+    return None
 
 
 # =========================
-# پیدا کردن ویدیو عمومی
+# پیدا کردن ویدیو از صفحه خبر
 # =========================
 
 def get_video_url(
@@ -755,6 +803,28 @@ def get_video_url(
 
     if not article_url:
         return None
+
+    print(
+        "CHECKING VIDEO:",
+        article_url
+    )
+
+    # اول آپارات
+    aparat_video = find_aparat_video(
+        article_url
+    )
+
+    if aparat_video:
+
+        print(
+            "✅ APARAT VIDEO FOUND"
+        )
+
+        return aparat_video
+
+    # -------------------------
+    # روش عمومی سایت
+    # -------------------------
 
     try:
 
@@ -782,40 +852,18 @@ def get_video_url(
             content_type
         )
 
-        # اگر خود URL ویدیو بود
         if content_type.startswith(
             "video/"
         ):
 
             return response.url
 
-        html = response.text
-
-        # ==================================================
-        # اول آپارات
-        # ==================================================
-
-        if "aparat.com" in html.lower():
-
-            aparat_video = (
-                get_aparat_video_from_html(
-                    html
-                )
-            )
-
-            if aparat_video:
-
-                return aparat_video
-
         soup = BeautifulSoup(
-            html,
+            response.text,
             "html.parser"
         )
 
-        # =========================
         # OG VIDEO
-        # =========================
-
         og_video_names = [
             "og:video",
             "og:video:url",
@@ -846,28 +894,23 @@ def get_video_url(
                     "content"
                 )
 
-                if url:
+                url = make_absolute_url(
+                    article_url,
+                    url
+                )
 
-                    url = make_absolute_url(
-                        article_url,
+                if is_probable_video_url(
+                    url
+                ):
+
+                    print(
+                        "VIDEO FOUND IN OG:",
                         url
                     )
 
-                    if is_probable_video_url(
-                        url
-                    ):
+                    return url
 
-                        print(
-                            "VIDEO FOUND IN OG:",
-                            url
-                        )
-
-                        return url
-
-        # =========================
         # VIDEO TAG
-        # =========================
-
         videos = soup.find_all(
             "video"
         )
@@ -918,16 +961,13 @@ def get_video_url(
                 ):
 
                     print(
-                        "VIDEO FOUND IN VIDEO TAG:",
+                        "VIDEO FOUND:",
                         url
                     )
 
                     return url
 
-        # =========================
         # SOURCE TAG
-        # =========================
-
         sources = soup.find_all(
             "source"
         )
@@ -957,37 +997,6 @@ def get_video_url(
 
                     return url
 
-        # =========================
-        # لینک‌های مستقیم
-        # =========================
-
-        for link in soup.find_all(
-            "a",
-            href=True
-        ):
-
-            url = link.get(
-                "href"
-            )
-
-            if url:
-
-                url = make_absolute_url(
-                    article_url,
-                    url
-                )
-
-                if is_probable_video_url(
-                    url
-                ):
-
-                    print(
-                        "VIDEO FOUND IN LINK:",
-                        url
-                    )
-
-                    return url
-
     except Exception as e:
 
         print(
@@ -1000,26 +1009,6 @@ def get_video_url(
     )
 
     return None
-
-
-# ==========================================================
-# استخراج ویدیو آپارات از HTML
-# ==========================================================
-
-def get_aparat_video_from_html(
-    html
-):
-
-    video_hash = find_aparat_hash_from_html(
-        html
-    )
-
-    if not video_hash:
-        return None
-
-    return get_aparat_video_url(
-        video_hash
-    )
 
 
 # =========================
@@ -1174,19 +1163,9 @@ async def send_media(
             ""
         ).lower()
 
-        content_length = len(
-            response.content
-        )
-
         print(
             "MEDIA CONTENT TYPE:",
             content_type
-        )
-
-        print(
-            "MEDIA SIZE:",
-            content_length,
-            "bytes"
         )
 
         # =========================
@@ -1215,9 +1194,12 @@ async def send_media(
         # =========================
 
         if (
-            content_type.startswith("video/")
-            or
-            ".mp4" in media_url.lower()
+            content_type.startswith(
+                "video/"
+            )
+            or is_probable_video_url(
+                media_url
+            )
         ):
 
             await bot.send_video(
@@ -1261,15 +1243,10 @@ async def main():
     if not CHANNEL:
 
         print(
-            "❌ CHANNEL_ID یا CHANNEL پیدا نشد"
+            "❌ CHANNEL یا CHANNEL_ID پیدا نشد"
         )
 
         return
-
-    print(
-        "CHANNEL:",
-        CHANNEL
-    )
 
     sent_news = load_sent_news()
 
@@ -1314,7 +1291,11 @@ async def main():
         try:
 
             print(
-                "CHECKING VIDEO:",
+                "=============================="
+            )
+
+            print(
+                "PROCESSING:",
                 news["title"]
             )
 
@@ -1323,19 +1304,15 @@ async def main():
                 link
             )
 
-            # ==================================================
-            # پیدا کردن ویدیو
-            # ==================================================
-
             video_url = get_video_url(
                 link
             )
 
             media_sent = False
 
-            # ==================================================
-            # ارسال ویدیو
-            # ==================================================
+            # =========================
+            # ویدیو
+            # =========================
 
             if video_url:
 
@@ -1353,12 +1330,12 @@ async def main():
                 if media_sent:
 
                     print(
-                        "🎥 VIDEO NEWS SENT"
+                        "✅ VIDEO NEWS SENT"
                     )
 
-            # ==================================================
-            # اگر ویدیو ارسال نشد، عکس RSS
-            # ==================================================
+            # =========================
+            # عکس RSS
+            # =========================
 
             if not media_sent:
 
@@ -1369,7 +1346,8 @@ async def main():
                 if rss_media:
 
                     print(
-                        "USING RSS MEDIA"
+                        "USING RSS MEDIA:",
+                        rss_media
                     )
 
                     media_sent = await send_media(
@@ -1378,9 +1356,9 @@ async def main():
                         message
                     )
 
-            # ==================================================
-            # اگر هیچ رسانه‌ای نبود
-            # ==================================================
+            # =========================
+            # فقط متن
+            # =========================
 
             if not media_sent:
 
@@ -1395,9 +1373,9 @@ async def main():
                     disable_web_page_preview=True
                 )
 
-            # ==================================================
+            # =========================
             # ذخیره خبر
-            # ==================================================
+            # =========================
 
             sent_news.append(
                 link
@@ -1425,6 +1403,10 @@ async def main():
             )
 
             print(e)
+
+    print(
+        "================================"
+    )
 
     print(
         "✅ اجرای ربات تمام شد.",
