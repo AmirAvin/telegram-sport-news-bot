@@ -1,5 +1,6 @@
 import requests
 import re
+import json
 
 URL = "https://www.aparat.com/v/mxh0449"
 
@@ -9,18 +10,14 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0 Safari/537.36"
     ),
-    "Accept": (
-        "text/html,application/xhtml+xml,"
-        "application/xml;q=0.9,image/avif,"
-        "image/webp,*/*;q=0.8"
-    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
 
 def main():
 
-    print("OPENING APARAT VIDEO:")
+    print("OPENING APARAT:")
     print(URL)
 
     try:
@@ -32,82 +29,26 @@ def main():
         )
 
         print("STATUS:", response.status_code)
-        print("FINAL URL:", response.url)
-
-        print(
-            "CONTENT TYPE:",
-            response.headers.get("content-type")
-        )
-
-        print(
-            "HTML LENGTH:",
-            len(response.text)
-        )
+        print("HTML LENGTH:", len(response.text))
 
         html = response.text
 
-        print("\n=== MP4 SEARCH ===")
+        print("\n=== SEARCH VIDEO DATA ===")
 
-        found = set()
-
-        patterns = [
-            r'https?://[^"\']+\.mp4[^"\']*',
-            r'https?:\\?/\\?/[^"\']+\.mp4[^"\']*',
-            r'"url"\s*:\s*"([^"]+)"',
-            r'"src"\s*:\s*"([^"]+)"',
-            r'"file"\s*:\s*"([^"]+)"',
+        keywords = [
+            "video",
+            "stream",
+            "cdn",
+            "file",
+            "url",
+            "quality",
+            "video_id",
+            "videoId",
+            "videoHash",
+            "hash"
         ]
 
-        for pattern in patterns:
-
-            matches = re.findall(
-                pattern,
-                html,
-                re.IGNORECASE
-            )
-
-            for match in matches:
-
-                if isinstance(match, tuple):
-                    match = match[0]
-
-                url = match.replace(
-                    "\\/",
-                    "/"
-                )
-
-                if (
-                    "mp4" in url.lower()
-                    or "video" in url.lower()
-                    or "cdn" in url.lower()
-                ):
-
-                    if url not in found:
-
-                        found.add(url)
-
-                        print(
-                            "FOUND:",
-                            url[:2000]
-                        )
-
-        print("\n=== IMPORTANT WORDS ===")
-
-        for keyword in [
-            "video",
-            "file",
-            "src",
-            "url",
-            "cdn",
-            "stream",
-            "quality",
-            "360",
-            "480",
-            "720",
-            "1080",
-            "m3u8",
-            "mp4"
-        ]:
+        for keyword in keywords:
 
             print(
                 keyword,
@@ -117,11 +58,69 @@ def main():
                 )
             )
 
-        print("\n=== HTML PREVIEW ===")
+        print("\n=== JSON-LIKE DATA ===")
 
-        print(
-            html[:3000]
+        patterns = [
+            r'"video[^"]*"\s*:\s*"[^"]+"',
+            r'"stream[^"]*"\s*:\s*"[^"]+"',
+            r'"cdn[^"]*"\s*:\s*"[^"]+"',
+            r'"file[^"]*"\s*:\s*"[^"]+"',
+            r'"url"\s*:\s*"[^"]+"',
+            r'"src"\s*:\s*"[^"]+"',
+        ]
+
+        found = set()
+
+        for pattern in patterns:
+
+            matches = re.findall(
+                pattern,
+                html,
+                re.IGNORECASE
+            )
+
+            for item in matches:
+
+                item = item.replace(
+                    "\\/",
+                    "/"
+                )
+
+                if item not in found:
+
+                    found.add(item)
+
+                    print(
+                        item[:2000]
+                    )
+
+        print("\n=== APARAT CDN LINKS ===")
+
+        urls = re.findall(
+            r'https?://[^"\']+',
+            html
         )
+
+        for url in urls:
+
+            url = url.replace(
+                "\\/",
+                "/"
+            )
+
+            if any(
+                word in url.lower()
+                for word in [
+                    "cdn",
+                    "video",
+                    "stream",
+                    "aparat"
+                ]
+            ):
+
+                print(
+                    url[:2000]
+                )
 
         print("\n=== FINISHED ===")
 
