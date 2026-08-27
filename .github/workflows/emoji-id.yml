@@ -47,8 +47,9 @@ jobs:
               print("MESSAGE SENT")
               print("Message ID:", message.message_id)
 
+              await bot.shutdown()
+
           asyncio.run(main())
           PY
 
           python send_emoji.py
-`
