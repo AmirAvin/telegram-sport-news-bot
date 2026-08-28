@@ -18,7 +18,7 @@ jobs:
           import json
 
           token = os.environ["BOT_TOKEN"]
-          emoji_id = "5220181540222291016"
+          emoji_id = 5791832221211959289
 
           url = f"https://api.telegram.org/bot{token}/getCustomEmojiStickers"
 
