@@ -1,29 +1,36 @@
-name: Test Custom Emoji
+import os
+import asyncio
+from telegram import Bot
+from telegram.constants import ParseMode
 
-on:
-  workflow_dispatch:
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+CHANNEL_ID = os.environ["CHANNEL_ID"]
 
-jobs:
-  test-emoji:
-    runs-on: ubuntu-latest
+CUSTOM_EMOJI_ID = "5220181540222291016"
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
+async def main():
+    bot = Bot(token=BOT_TOKEN)
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install python-telegram-bot==20.8
+    text = (
+        f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">🌪</tg-emoji> '
+        'تست Animated Custom Emoji'
+    )
 
-      - name: Send Animated Custom Emoji
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-        run: |
-          python test_custom_emoji.py
+    message = await bot.send_message(
+        chat_id=CHANNEL_ID,
+        text=text,
+        parse_mode=ParseMode.HTML,
+    )
+
+    print("MESSAGE SENT")
+    print("Message ID:", message.message_id)
+
+    if message.entities:
+        print("ENTITIES:", message.entities)
+    else:
+        print("ENTITIES: NONE")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
