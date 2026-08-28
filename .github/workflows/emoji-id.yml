@@ -16,12 +16,9 @@ jobs:
       - name: Install requests
         run: pip install requests
 
-      - name: Send Custom Emoji
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+      - name: Create test file
         run: |
-          python -c '
+          cat > test_emoji.py <<'PY'
           import os
           import requests
 
@@ -34,7 +31,7 @@ jobs:
 
           data = {
               "chat_id": channel,
-              "text": f"<tg-emoji emoji-id=\"{emoji_id}\">⚽️</tg-emoji> تست لوگوی لیگ‌برتر",
+              "text": f'<tg-emoji emoji-id="{emoji_id}">⚽️</tg-emoji> تست لوگوی لیگ‌برتر',
               "parse_mode": "HTML"
           }
 
@@ -49,3 +46,10 @@ jobs:
 
           if not response.ok:
               raise SystemExit(1)
+          PY
+
+      - name: Send test
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python test_emoji
