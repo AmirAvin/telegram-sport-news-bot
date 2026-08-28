@@ -1,73 +1,60 @@
-name: Find LigaBartar Custom Emoji ID
+name: Test LigaBartar Custom Emoji
 
 on:
   workflow_dispatch:
 
 jobs:
-  find-emoji:
+  test-emoji:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Find Custom Emoji ID
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install Telegram library
+        run: pip install python-telegram-bot==20.8
+
+      - name: Test Custom Emoji
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
-          python - <<'PY'
+          cat > test_emoji.py <<'PY'
           import os
-          import requests
+          import asyncio
+          from telegram import Bot
 
-          bot_token = os.environ["BOT_TOKEN"]
+          BOT_TOKEN = os.environ["BOT_TOKEN"]
+          CHANNEL_ID = os.environ["CHANNEL_ID"]
 
-          sticker_set_name = "LigaBartar24Emoji"
+          CUSTOM_EMOJI_ID = "5791645007882495057"
 
-          url = f"https://api.telegram.org/bot{bot_token}/getStickerSet"
+          async def main():
 
-          response = requests.get(
-              url,
-              params={
-                  "name": sticker_set_name
-              },
-              timeout=30
-          )
-
-          print("STATUS:", response.status_code)
-
-          data = response.json()
-
-          print("OK:", data.get("ok"))
-
-          if not data.get("ok"):
-              print("ERROR:")
-              print(data)
-              raise SystemExit(1)
-
-          sticker_set = data["result"]
-
-          print("================================")
-          print("SET NAME:", sticker_set.get("name"))
-          print("SET TITLE:", sticker_set.get("title"))
-          print("SET TYPE:", sticker_set.get("sticker_type"))
-          print("NUMBER OF EMOJIS:", len(sticker_set.get("stickers", [])))
-          print("================================")
-
-          for i, sticker in enumerate(
-              sticker_set.get("stickers", []),
-              start=1
-          ):
-              print()
-              print("EMOJI NUMBER:", i)
-              print("FILE ID:", sticker.get("file_id"))
-              print("FILE UNIQUE ID:", sticker.get("file_unique_id"))
-              print("TYPE:", sticker.get("type"))
-              print("EMOJI:", sticker.get("emoji"))
-              print(
-                  "CUSTOM EMOJI ID:",
-                  sticker.get("custom_emoji_id")
+              bot = Bot(
+                  token=BOT_TOKEN
               )
-              print("SET NAME:", sticker.get("set_name"))
 
-          print()
-          print("================================")
-          print("DONE")
-          print("================================")
+              print("Testing Custom Emoji...")
+              print("CUSTOM EMOJI ID:", CUSTOM_EMOJI_ID)
+
+              message = await bot.send_message(
+                  chat_id=CHANNEL_ID,
+                  text=(
+                      '<tg-emoji emoji-id="'
+                      + CUSTOM_EMOJI_ID
+                      + '">⚽️</tg-emoji> '
+                      'تست نهایی لوگوی لیگ‌برتر'
+                  ),
+                  parse_mode="HTML"
+              )
+
+              print("MESSAGE SENT")
+              print("MESSAGE ID:", message.message_id)
+
+          asyncio.run(main())
           PY
+
+          python test_emoji.p
