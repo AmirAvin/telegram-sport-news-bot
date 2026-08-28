@@ -1,55 +1,31 @@
-name: Test LigaBartar Custom Emoji
+=“61482”}
+name: Check LigaBartar Emoji
 
 on:
-  workflow_dispatch:
+workflow_dispatch:
 
 jobs:
-  test-emoji:
-    runs-on: ubuntu-latest
+check:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Install requests
-        run: pip install requests
-
-      - name: Create test file
-        run: |
-          cat > test_emoji.py <<'PY'
-          import os
-          import requests
-
-          token = os.environ["BOT_TOKEN"]
-          channel = os.environ["CHANNEL_ID"]
-
-          emoji_id = "5791645007882495057"
-
-          url = f"https://api.telegram.org/bot{token}/sendMessage"
-
-          data = {
-              "chat_id": channel,
-              "text": f'<tg-emoji emoji-id="{emoji_id}">⚽️</tg-emoji> تست لوگوی لیگ‌برتر',
-              "parse_mode": "HTML"
-          }
-
-          response = requests.post(
-              url,
-              data=data,
-              timeout=30
-          )
-
-          print("STATUS:", response.status_code)
-          print("RESPONSE:", response.text)
-
-          if not response.ok:
-              raise SystemExit(1)
-          PY
-
-      - name: Send test
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-        run: python test_emoji
+steps:
+  - name: Check Custom Emoji
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+    run: |
+      python - <<'PY'
+      import os
+      import requests
+      token = os.environ["BOT_TOKEN"]
+      emoji_id = "5791645007882495057"
+      url = f"https://api.telegram.org/bot{token}/getCustomEmojiStickers"
+      response = requests.get(
+          url,
+          params={"custom_emoji_ids": emoji_id},
+          timeout=30
+      )
+      print("STATUS:", response.status_code)
+      print("RESPONSE:")
+      print(response.text)
+      if not response.ok:
+          raise SystemExit(1)
