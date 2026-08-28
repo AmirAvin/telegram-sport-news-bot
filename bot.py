@@ -9,22 +9,12 @@ from bs4 import BeautifulSoup
 from telegram import Bot
 
 
-# =========================
-# تنظیمات
-# =========================
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL")
 
 SENT_FILE = "sent_news.json"
-
 MAX_NEWS_PER_RUN = 10
-
 REQUEST_TIMEOUT = 20
-
-# =========================
-# Custom Emoji لوگوی لیگ‌برتر
-# =========================
 
 CUSTOM_EMOJI_ID = "5791832221211959289"
 
@@ -36,10 +26,6 @@ HEADERS = {
     )
 }
 
-
-# =========================
-# کلمات فوتبال
-# =========================
 
 FOOTBALL_KEYWORDS = [
     "فوتبال",
@@ -77,10 +63,6 @@ FOOTBALL_KEYWORDS = [
     "پاری سن ژرمن",
 ]
 
-
-# =========================
-# هشتگ‌ها
-# =========================
 
 HASHTAG_KEYWORDS = [
     "استقلال",
@@ -123,10 +105,6 @@ HASHTAG_KEYWORDS = [
 ]
 
 
-# =========================
-# منابع RSS
-# =========================
-
 RSS_SOURCES = [
     "https://www.isna.ir/rss",
     "https://www.khabarvarzeshi.com/rss",
@@ -135,43 +113,25 @@ RSS_SOURCES = [
 ]
 
 
-# =========================
-# اخبار ارسال شده
-# =========================
-
 def load_sent_news():
-
     if not os.path.exists(SENT_FILE):
         return []
 
     try:
-
-        with open(
-            SENT_FILE,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
+        with open(SENT_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         if isinstance(data, list):
             return data
 
-        return []
-
     except Exception:
+        pass
 
-        return []
+    return []
 
 
 def save_sent_news(sent_news):
-
-    with open(
-        SENT_FILE,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
+    with open(SENT_FILE, "w", encoding="utf-8") as f:
         json.dump(
             sent_news[-1000:],
             f,
@@ -180,43 +140,20 @@ def save_sent_news(sent_news):
         )
 
 
-# =========================
-# تمیز کردن متن
-# =========================
-
 def clean_text(text):
-
     if not text:
         return ""
 
-    soup = BeautifulSoup(
-        text,
-        "html.parser"
-    )
+    soup = BeautifulSoup(text, "html.parser")
 
-    text = soup.get_text(
-        " ",
-        strip=True
-    )
+    text = soup.get_text(" ", strip=True)
 
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
+    text = re.sub(r"\s+", " ", text)
 
     return text.strip()
 
 
-# =========================
-# کوتاه کردن متن
-# =========================
-
-def shorten_text(
-    text,
-    max_length=700
-):
-
+def shorten_text(text, max_length=700):
     text = clean_text(text)
 
     if not text:
@@ -235,39 +172,18 @@ def shorten_text(
     return shortened + "..."
 
 
-# =========================
-# تشخیص خبر فوتبالی
-# =========================
-
-def is_football_news(
-    title,
-    summary
-):
-
-    text = (
-        f"{title} {summary}"
-    ).lower()
+def is_football_news(title, summary):
+    text = f"{title} {summary}".lower()
 
     for keyword in FOOTBALL_KEYWORDS:
-
         if keyword.lower() in text:
             return True
 
     return False
 
 
-# =========================
-# ساخت هشتگ
-# =========================
-
-def create_hashtags(
-    title,
-    summary
-):
-
-    text = (
-        f"{title} {summary}"
-    )
+def create_hashtags(title, summary):
+    text = f"{title} {summary}"
 
     found = []
 
@@ -278,16 +194,9 @@ def create_hashtags(
     )
 
     for keyword in sorted_keywords:
-
         if keyword.lower() in text.lower():
 
-            hashtag = (
-                "#" +
-                keyword.replace(
-                    " ",
-                    "_"
-                )
-            )
+            hashtag = "#" + keyword.replace(" ", "_")
 
             if hashtag not in found:
                 found.append(hashtag)
@@ -295,62 +204,38 @@ def create_hashtags(
         if len(found) >= 5:
             break
 
-    if len(found) < 3:
+    if len(found) < 3 and "#فوتبال" not in found:
+        found.append("#فوتبال")
 
-        if "#فوتبال" not in found:
-            found.append("#فوتبال")
+    if len(found) < 3 and "#اخبار_فوتبال" not in found:
+        found.append("#اخبار_فوتبال")
 
-    if len(found) < 3:
+    return " ".join(found[:5])
 
-        if "#اخبار_فوتبال" not in found:
-            found.append("#اخبار_فوتبال")
-
-    return " ".join(
-        found[:5]
-    )
-
-
-# =========================
-# پیدا کردن رسانه در RSS
-# =========================
 
 def get_media_url(entry):
 
-    media_content = entry.get(
-        "media_content",
-        []
-    )
+    media_content = entry.get("media_content", [])
 
     if media_content:
-
         for media in media_content:
-
             url = media.get("url")
 
             if url:
                 return url
 
-    media_thumbnail = entry.get(
-        "media_thumbnail",
-        []
-    )
+    media_thumbnail = entry.get("media_thumbnail", [])
 
     if media_thumbnail:
-
         for media in media_thumbnail:
-
             url = media.get("url")
 
             if url:
                 return url
 
-    enclosures = entry.get(
-        "enclosures",
-        []
-    )
+    enclosures = entry.get("enclosures", [])
 
     if enclosures:
-
         for enclosure in enclosures:
 
             url = (
@@ -361,10 +246,7 @@ def get_media_url(entry):
             if url:
                 return url
 
-    html = entry.get(
-        "summary",
-        ""
-    )
+    html = entry.get("summary", "")
 
     if html:
 
@@ -388,10 +270,6 @@ def get_media_url(entry):
     return None
 
 
-# =========================
-# تشخیص URL ویدیو
-# =========================
-
 def is_probable_video_url(url):
 
     if not url:
@@ -409,7 +287,6 @@ def is_probable_video_url(url):
     ]
 
     for extension in video_extensions:
-
         if extension in url_lower:
             return True
 
@@ -423,21 +300,13 @@ def is_probable_video_url(url):
     ]
 
     for word in video_words:
-
         if word in url_lower:
             return True
 
     return False
 
 
-# =========================
-# تبدیل URL نسبی به کامل
-# =========================
-
-def make_absolute_url(
-    base_url,
-    url
-):
+def make_absolute_url(base_url, url):
 
     if not url:
         return None
@@ -453,19 +322,10 @@ def make_absolute_url(
 
     from urllib.parse import urljoin
 
-    return urljoin(
-        base_url,
-        url
-    )
+    return urljoin(base_url, url)
 
 
-# =========================
-# پیدا کردن ویدیو از صفحه خبر
-# =========================
-
-def get_video_url(
-    article_url
-):
+def get_video_url(article_url):
 
     if not article_url:
         return None
@@ -504,10 +364,6 @@ def get_video_url(
             "html.parser"
         )
 
-        # =========================
-        # OG VIDEO
-        # =========================
-
         og_video_names = [
             "og:video",
             "og:video:url",
@@ -518,18 +374,13 @@ def get_video_url(
 
             tag = soup.find(
                 "meta",
-                attrs={
-                    "property": name
-                }
+                attrs={"property": name}
             )
 
             if not tag:
-
                 tag = soup.find(
                     "meta",
-                    attrs={
-                        "name": name
-                    }
+                    attrs={"name": name}
                 )
 
             if tag:
@@ -551,10 +402,6 @@ def get_video_url(
                         )
 
                         return url
-
-        # =========================
-        # VIDEO TAG
-        # =========================
 
         videos = soup.find_all("video")
 
@@ -598,10 +445,6 @@ def get_video_url(
 
                     return url
 
-        # =========================
-        # SOURCE TAG
-        # =========================
-
         sources = soup.find_all("source")
 
         for source in sources:
@@ -627,14 +470,7 @@ def get_video_url(
 
                     return url
 
-        # =========================
-        # لینک‌های مستقیم ویدیو
-        # =========================
-
-        for link in soup.find_all(
-            "a",
-            href=True
-        ):
+        for link in soup.find_all("a", href=True):
 
             url = link.get("href")
 
@@ -668,10 +504,6 @@ def get_video_url(
     return None
 
 
-# =========================
-# دریافت خبرها
-# =========================
-
 def get_news():
 
     all_news = []
@@ -700,17 +532,11 @@ def get_news():
             for entry in feed.entries:
 
                 title = clean_text(
-                    entry.get(
-                        "title",
-                        ""
-                    )
+                    entry.get("title", "")
                 )
 
                 summary = clean_text(
-                    entry.get(
-                        "summary",
-                        ""
-                    )
+                    entry.get("summary", "")
                 )
 
                 link = entry.get(
@@ -750,10 +576,6 @@ def get_news():
     return all_news
 
 
-# =========================
-# ساخت متن خبر + Custom Emoji
-# =========================
-
 def create_message(news):
 
     title = news["title"]
@@ -767,7 +589,6 @@ def create_message(news):
         summary
     )
 
-    # Custom Emoji واقعی تلگرام
     logo = (
         f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">'
         f'🏆'
@@ -779,10 +600,7 @@ def create_message(news):
     )
 
     if summary:
-
-        message += (
-            f"{summary}\n\n"
-        )
+        message += f"{summary}\n\n"
 
     message += (
         f"{hashtags}\n\n"
@@ -791,10 +609,6 @@ def create_message(news):
 
     return message
 
-
-# =========================
-# ارسال رسانه
-# =========================
 
 async def send_media(
     bot,
@@ -830,10 +644,6 @@ async def send_media(
             content_type
         )
 
-        # =========================
-        # عکس
-        # =========================
-
         if content_type.startswith("image/"):
 
             await bot.send_photo(
@@ -848,10 +658,6 @@ async def send_media(
             )
 
             return True
-
-        # =========================
-        # ویدیو
-        # =========================
 
         if content_type.startswith("video/"):
 
@@ -868,10 +674,6 @@ async def send_media(
             )
 
             return True
-
-        # =========================
-        # URL شبیه ویدیو
-        # =========================
 
         if is_probable_video_url(media_url):
 
@@ -898,10 +700,6 @@ async def send_media(
 
     return False
 
-
-# =========================
-# اجرای اصلی
-# =========================
 
 async def main():
 
@@ -973,7 +771,7 @@ async def main():
             )
 
             print(
-                "CHECKING VIDEO:",
+                "ARTICLE URL:",
                 link
             )
 
@@ -982,10 +780,6 @@ async def main():
             )
 
             media_sent = False
-
-            # =========================
-            # اگر ویدیو پیدا شد
-            # =========================
 
             if video_url:
 
@@ -1003,13 +797,8 @@ async def main():
                 if media_sent:
 
                     print(
-                        "VIDEO NEWS SENT"
+                        "✅ VIDEO NEWS SENT"
                     )
-
-            # =========================
-            # اگر ویدیو ارسال نشد
-            # عکس RSS
-            # =========================
 
             if not media_sent:
 
@@ -1020,7 +809,8 @@ async def main():
                 if rss_media:
 
                     print(
-                        "USING RSS MEDIA"
+                        "USING RSS MEDIA:",
+                        rss_media
                     )
 
                     media_sent = await send_media(
@@ -1028,10 +818,6 @@ async def main():
                         rss_media,
                         message
                     )
-
-            # =========================
-            # اگر رسانه نبود
-            # =========================
 
             if not media_sent:
 
@@ -1046,9 +832,9 @@ async def main():
                     disable_web_page_preview=True
                 )
 
-            # =========================
-            # ذخیره خبر
-            # =========================
+                print(
+                    "TEXT SENT"
+                )
 
             sent_news.append(
                 link
@@ -1070,27 +856,20 @@ async def main():
         except Exception as e:
 
             print(
-                "SEND ERROR:"
+                "SEND ERROR:",
+                e
             )
-
-            print(e)
 
     print(
         "================================"
     )
 
     print(
-        "✅ اجرای ربات تمام شد.",
-        sent_count,
-        "خبر ارسال شد."
+        f"✅ اجرای ربات تمام شد. "
+        f"{sent_count} خبر ارسال شد."
     )
 
 
-# =========================
-# شروع
-# =========================
-
 if __name__ == "__main__":
-
-    asyncio.run(
-        main()
+    asyncio.run(main())
+`
