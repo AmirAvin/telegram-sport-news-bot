@@ -15,7 +15,6 @@ SENT_FILE = "sent_news.json"
 MAX_NEWS_PER_RUN = 10
 REQUEST_TIMEOUT = 20
 
-# Custom Emoji واقعی لوگوی لیگ برتر
 CUSTOM_EMOJI_ID = "5791645007882495057"
 
 HEADERS = {
@@ -55,7 +54,7 @@ FOOTBALL_KEYWORDS = [
     "اینتر",
     "میلان",
     "یوونتوس",
-    "پاری سن ژرمن",
+    "پاری سن ژرمن"
 ]
 
 HASHTAG_KEYWORDS = [
@@ -90,14 +89,14 @@ HASHTAG_KEYWORDS = [
     "یوونتوس",
     "پاری سن ژرمن",
     "فوتبال ایران",
-    "فوتبال اروپا",
+    "فوتبال اروپا"
 ]
 
 RSS_SOURCES = [
     "https://www.isna.ir/rss",
     "https://www.khabarvarzeshi.com/rss",
     "https://www.varzesh3.com/rss",
-    "https://www.tasnimnews.com/fa/rss",
+    "https://www.tasnimnews.com/fa/rss"
 ]
 
 
@@ -297,7 +296,10 @@ def get_video_url(article_url):
             allow_redirects=True
         )
 
-        print("ARTICLE STATUS:", response.status_code)
+        print(
+            "ARTICLE STATUS:",
+            response.status_code
+        )
 
         response.raise_for_status()
 
@@ -474,9 +476,7 @@ def get_news():
                     "title": title,
                     "summary": summary,
                     "link": link,
-                    "media_url": get_media_url(
-                        entry
-                    )
+                    "media_url": get_media_url(entry)
                 })
 
         except Exception as error:
@@ -505,7 +505,7 @@ def create_message(news):
     logo = (
         '<tg-emoji emoji-id="'
         + CUSTOM_EMOJI_ID
-        + '">⚽️</tg-emoji>'
+        + '">🏆</tg-emoji>'
     )
 
     message = (
@@ -765,4 +765,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(m
