@@ -28,6 +28,7 @@ jobs:
 
           BOT_TOKEN = os.environ["BOT_TOKEN"]
           CHANNEL_ID = os.environ["CHANNEL_ID"]
+
           CUSTOM_EMOJI_ID = "5791832221211959289"
 
           async def main():
@@ -35,7 +36,7 @@ jobs:
 
               text = (
                   f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">🏆</tg-emoji> '
-                  'تست لوگوی لیگ‌برتر @ligebartar24'
+                  'تست لوگوی واقعی لیگ‌برتر @ligebartar24'
               )
 
               message = await bot.send_message(
@@ -45,9 +46,7 @@ jobs:
               )
 
               print("MESSAGE SENT")
-              print("Message ID:", message.message_id)
-
-              await bot.shutdown()
+              print("MESSAGE ID:", message.message_id)
 
           asyncio.run(main())
           PY
