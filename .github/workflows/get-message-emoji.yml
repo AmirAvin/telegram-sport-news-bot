@@ -1,0 +1,34 @@
+name: Get Message Custom Emoji
+
+on:
+  workflow_dispatch:
+
+jobs:
+  get-emoji:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Read Telegram Updates
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          import requests
+
+          token = os.environ["BOT_TOKEN"]
+
+          url = f"https://api.telegram.org/bot{token}/getUpdates"
+
+          response = requests.get(
+              url,
+              params={"limit": 20},
+              timeout=30
+          )
+
+          print("STATUS:", response.status_code)
+          print(response.text)
+
+          if not response.ok:
+              raise SystemExit(1)
+          PY
