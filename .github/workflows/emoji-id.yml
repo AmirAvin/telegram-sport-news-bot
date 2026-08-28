@@ -1,13 +1,3 @@
-=“61482”}
-name: Check LigaBartar Emoji
-
-on:
-workflow_dispatch:
-
-jobs:
-check:
-runs-on: ubuntu-latest
-
 steps:
   - name: Check Custom Emoji
     env:
@@ -16,16 +6,25 @@ steps:
       python - <<'PY'
       import os
       import requests
+
       token = os.environ["BOT_TOKEN"]
       emoji_id = "5791645007882495057"
+
       url = f"https://api.telegram.org/bot{token}/getCustomEmojiStickers"
+
       response = requests.get(
           url,
-          params={"custom_emoji_ids": emoji_id},
+          params={
+              "custom_emoji_ids": emoji_id
+          },
           timeout=30
       )
+
       print("STATUS:", response.status_code)
-      print("RESPONSE:")
+      print("================================")
       print(response.text)
+      print("================================")
+
       if not response.ok:
           raise SystemExit(1)
+      P
