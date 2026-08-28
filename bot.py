@@ -15,6 +15,7 @@ SENT_FILE = "sent_news.json"
 MAX_NEWS_PER_RUN = 10
 REQUEST_TIMEOUT = 20
 
+# Custom Emoji واقعی لوگوی لیگ برتر
 CUSTOM_EMOJI_ID = "5791645007882495057"
 
 HEADERS = {
@@ -181,9 +182,7 @@ def create_hashtags(title, summary):
     )
 
     for keyword in keywords:
-
         if keyword.lower() in text:
-
             hashtag = "#" + keyword.replace(" ", "_")
 
             if hashtag not in found:
@@ -202,7 +201,6 @@ def create_hashtags(title, summary):
 
 
 def get_media_url(entry):
-
     media_content = entry.get("media_content", [])
 
     for media in media_content:
@@ -222,7 +220,6 @@ def get_media_url(entry):
     enclosures = entry.get("enclosures", [])
 
     for enclosure in enclosures:
-
         url = (
             enclosure.get("href")
             or enclosure.get("url")
@@ -234,7 +231,6 @@ def get_media_url(entry):
     summary = entry.get("summary", "")
 
     if summary:
-
         soup = BeautifulSoup(
             summary,
             "html.parser"
@@ -243,7 +239,6 @@ def get_media_url(entry):
         image = soup.find("img")
 
         if image:
-
             url = (
                 image.get("src")
                 or image.get("data-src")
@@ -256,7 +251,6 @@ def get_media_url(entry):
 
 
 def is_video_url(url):
-
     if not url:
         return False
 
@@ -272,7 +266,6 @@ def is_video_url(url):
     ]
 
     for extension in extensions:
-
         if extension in url:
             return True
 
@@ -286,7 +279,6 @@ def is_video_url(url):
     ]
 
     for word in words:
-
         if word in url:
             return True
 
@@ -294,12 +286,10 @@ def is_video_url(url):
 
 
 def get_video_url(article_url):
-
     if not article_url:
         return None
 
     try:
-
         response = requests.get(
             article_url,
             timeout=REQUEST_TIMEOUT,
@@ -307,10 +297,7 @@ def get_video_url(article_url):
             allow_redirects=True
         )
 
-        print(
-            "ARTICLE STATUS:",
-            response.status_code
-        )
+        print("ARTICLE STATUS:", response.status_code)
 
         response.raise_for_status()
 
@@ -339,32 +326,27 @@ def get_video_url(article_url):
         ]
 
         for name in og_names:
-
             tag = soup.find(
                 "meta",
                 attrs={"property": name}
             )
 
             if not tag:
-
                 tag = soup.find(
                     "meta",
                     attrs={"name": name}
                 )
 
             if tag:
-
                 url = tag.get("content")
 
                 if url:
-
                     url = urljoin(
                         article_url,
                         url
                     )
 
                     if is_video_url(url):
-
                         print(
                             "VIDEO FOUND OG:",
                             url
@@ -375,7 +357,6 @@ def get_video_url(article_url):
         videos = soup.find_all("video")
 
         for video in videos:
-
             candidates = []
 
             src = video.get("src")
@@ -389,7 +370,6 @@ def get_video_url(article_url):
                 candidates.append(data_src)
 
             for source in video.find_all("source"):
-
                 src = (
                     source.get("src")
                     or source.get("data-src")
@@ -399,16 +379,14 @@ def get_video_url(article_url):
                     candidates.append(src)
 
             for url in candidates:
-
                 url = urljoin(
                     article_url,
                     url
                 )
 
                 if is_video_url(url):
-
                     print(
-                        "VIDEO FOUND:",
+                        "VIDEO FOUND TAG:",
                         url
                     )
 
@@ -417,21 +395,18 @@ def get_video_url(article_url):
         sources = soup.find_all("source")
 
         for source in sources:
-
             url = (
                 source.get("src")
                 or source.get("data-src")
             )
 
             if url:
-
                 url = urljoin(
                     article_url,
                     url
                 )
 
                 if is_video_url(url):
-
                     print(
                         "VIDEO FOUND SOURCE:",
                         url
@@ -440,27 +415,21 @@ def get_video_url(article_url):
                     return url
 
     except Exception as error:
-
         print(
             "VIDEO PAGE ERROR:",
             error
         )
 
-    print(
-        "VIDEO NOT FOUND"
-    )
+    print("VIDEO NOT FOUND")
 
     return None
 
 
 def get_news():
-
     all_news = []
 
     for rss_url in RSS_SOURCES:
-
         try:
-
             print(
                 "READING RSS:",
                 rss_url
@@ -479,7 +448,6 @@ def get_news():
             )
 
             for entry in feed.entries:
-
                 title = clean_text(
                     entry.get("title", "")
                 )
@@ -506,11 +474,12 @@ def get_news():
                     "title": title,
                     "summary": summary,
                     "link": link,
-                    "media_url": get_media_url(entry)
+                    "media_url": get_media_url(
+                        entry
+                    )
                 })
 
         except Exception as error:
-
             print(
                 "RSS ERROR:",
                 rss_url
@@ -522,7 +491,6 @@ def get_news():
 
 
 def create_message(news):
-
     title = news["title"]
 
     summary = shorten_text(
@@ -548,7 +516,6 @@ def create_message(news):
     )
 
     if summary:
-
         message += (
             summary
             + "\n\n"
@@ -568,12 +535,10 @@ async def send_media(
     media_url,
     caption
 ):
-
     if not media_url:
         return False
 
     try:
-
         print(
             "MEDIA URL:",
             media_url
@@ -598,7 +563,6 @@ async def send_media(
         )
 
         if content_type.startswith("image/"):
-
             await bot.send_photo(
                 chat_id=CHANNEL,
                 photo=response.content,
@@ -606,14 +570,11 @@ async def send_media(
                 parse_mode="HTML"
             )
 
-            print(
-                "PHOTO SENT"
-            )
+            print("PHOTO SENT")
 
             return True
 
         if content_type.startswith("video/"):
-
             await bot.send_video(
                 chat_id=CHANNEL,
                 video=response.content,
@@ -622,14 +583,11 @@ async def send_media(
                 supports_streaming=True
             )
 
-            print(
-                "VIDEO SENT"
-            )
+            print("VIDEO SENT")
 
             return True
 
         if is_video_url(media_url):
-
             await bot.send_video(
                 chat_id=CHANNEL,
                 video=response.content,
@@ -645,7 +603,6 @@ async def send_media(
             return True
 
     except Exception as error:
-
         print(
             "MEDIA ERROR:",
             error
@@ -655,9 +612,7 @@ async def send_media(
 
 
 async def main():
-
     if not BOT_TOKEN:
-
         print(
             "❌ BOT_TOKEN پیدا نشد"
         )
@@ -665,7 +620,6 @@ async def main():
         return
 
     if not CHANNEL:
-
         print(
             "❌ CHANNEL پیدا نشد"
         )
@@ -700,7 +654,6 @@ async def main():
         link = news["link"]
 
         if link in sent_news:
-
             print(
                 "SKIPPED OLD NEWS:",
                 news["title"]
@@ -713,7 +666,6 @@ async def main():
         )
 
         try:
-
             print(
                 "=============================="
             )
@@ -730,7 +682,6 @@ async def main():
             media_sent = False
 
             if video_url:
-
                 print(
                     "VIDEO FOUND:",
                     video_url
@@ -743,19 +694,16 @@ async def main():
                 )
 
                 if media_sent:
-
                     print(
                         "✅ VIDEO NEWS SENT"
                     )
 
             if not media_sent:
-
                 rss_media = news.get(
                     "media_url"
                 )
 
                 if rss_media:
-
                     print(
                         "TRY RSS MEDIA:",
                         rss_media
@@ -768,7 +716,6 @@ async def main():
                     )
 
             if not media_sent:
-
                 print(
                     "NO MEDIA - SENDING TEXT"
                 )
@@ -802,7 +749,6 @@ async def main():
             await asyncio.sleep(2)
 
         except Exception as error:
-
             print(
                 "SEND ERROR:",
                 error
@@ -820,4 +766,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-`
