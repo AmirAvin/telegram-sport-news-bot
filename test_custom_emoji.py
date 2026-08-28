@@ -5,7 +5,7 @@ from telegram import Bot
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHANNEL_ID = os.environ["CHANNEL_ID"]
 
-CUSTOM_EMOJI_ID = "5220181540222291016"
+CUSTOM_EMOJI_ID = CUSTOM_EMOJI_ID = "5791645007882495057"
 
 
 async def main():
