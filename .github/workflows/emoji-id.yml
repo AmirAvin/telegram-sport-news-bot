@@ -13,48 +13,39 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Telegram library
-        run: pip install python-telegram-bot==20.8
+      - name: Install requests
+        run: pip install requests
 
-      - name: Test Custom Emoji
+      - name: Send Custom Emoji
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
-          cat > test_emoji.py <<'PY'
+          python -c '
           import os
-          import asyncio
-          from telegram import Bot
+          import requests
 
-          BOT_TOKEN = os.environ["BOT_TOKEN"]
-          CHANNEL_ID = os.environ["CHANNEL_ID"]
+          token = os.environ["BOT_TOKEN"]
+          channel = os.environ["CHANNEL_ID"]
 
-          CUSTOM_EMOJI_ID = "5791645007882495057"
+          emoji_id = "5791645007882495057"
 
-          async def main():
+          url = f"https://api.telegram.org/bot{token}/sendMessage"
 
-              bot = Bot(
-                  token=BOT_TOKEN
-              )
+          data = {
+              "chat_id": channel,
+              "text": f"<tg-emoji emoji-id=\"{emoji_id}\">⚽️</tg-emoji> تست لوگوی لیگ‌برتر",
+              "parse_mode": "HTML"
+          }
 
-              print("Testing Custom Emoji...")
-              print("CUSTOM EMOJI ID:", CUSTOM_EMOJI_ID)
+          response = requests.post(
+              url,
+              data=data,
+              timeout=30
+          )
 
-              message = await bot.send_message(
-                  chat_id=CHANNEL_ID,
-                  text=(
-                      '<tg-emoji emoji-id="'
-                      + CUSTOM_EMOJI_ID
-                      + '">⚽️</tg-emoji> '
-                      'تست نهایی لوگوی لیگ‌برتر'
-                  ),
-                  parse_mode="HTML"
-              )
+          print("STATUS:", response.status_code)
+          print("RESPONSE:", response.text)
 
-              print("MESSAGE SENT")
-              print("MESSAGE ID:", message.message_id)
-
-          asyncio.run(main())
-          PY
-
-          python test_emoji.p
+          if not response.ok:
+              raise SystemExit(1)
