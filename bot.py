@@ -4,19 +4,26 @@ import re
 import asyncio
 import feedparser
 import requests
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 from telegram import Bot
 
 
+# =========================
+# SETTINGS
+# =========================
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL")
 
 SENT_FILE = "sent_news.json"
+
 MAX_NEWS_PER_RUN = 10
 REQUEST_TIMEOUT = 20
 
 CUSTOM_EMOJI_ID = "5791832221211959289"
+
 
 HEADERS = {
     "User-Agent": (
@@ -26,6 +33,10 @@ HEADERS = {
     )
 }
 
+
+# =========================
+# FOOTBALL KEYWORDS
+# =========================
 
 FOOTBALL_KEYWORDS = [
     "فوتبال",
@@ -64,6 +75,10 @@ FOOTBALL_KEYWORDS = [
 ]
 
 
+# =========================
+# HASHTAGS
+# =========================
+
 HASHTAG_KEYWORDS = [
     "استقلال",
     "پرسپولیس",
@@ -76,17 +91,12 @@ HASHTAG_KEYWORDS = [
     "لیگ برتر",
     "جام حذفی",
     "جام جهانی",
-    "لیگ قهرمانان اروپا",
     "لیگ قهرمانان",
     "لیگ اروپا",
     "لژیونر",
-    "مهدی طارمی",
     "طارمی",
-    "سردار آزمون",
     "آزمون",
-    "علیرضا جهانبخش",
     "جهانبخش",
-    "مهدی قایدی",
     "قایدی",
     "رئال مادرید",
     "بارسلونا",
@@ -105,6 +115,10 @@ HASHTAG_KEYWORDS = [
 ]
 
 
+# =========================
+# RSS SOURCES
+# =========================
+
 RSS_SOURCES = [
     "https://www.isna.ir/rss",
     "https://www.khabarvarzeshi.com/rss",
@@ -113,47 +127,80 @@ RSS_SOURCES = [
 ]
 
 
+# =========================
+# SENT NEWS
+# =========================
+
 def load_sent_news():
     if not os.path.exists(SENT_FILE):
         return []
 
     try:
-        with open(SENT_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        with open(
+            SENT_FILE,
+            "r",
+            encoding="utf-8"
+        ) as file:
+            data = json.load(file)
 
         if isinstance(data, list):
             return data
 
-    except Exception:
-        pass
+    except Exception as error:
+        print("LOAD SENT ERROR:", error)
 
     return []
 
 
 def save_sent_news(sent_news):
-    with open(SENT_FILE, "w", encoding="utf-8") as f:
-        json.dump(
-            sent_news[-1000:],
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
+    try:
+        with open(
+            SENT_FILE,
+            "w",
+            encoding="utf-8"
+        ) as file:
+            json.dump(
+                sent_news[-1000:],
+                file,
+                ensure_ascii=False,
+                indent=2
+            )
 
+    except Exception as error:
+        print("SAVE SENT ERROR:", error)
+
+
+# =========================
+# TEXT CLEAN
+# =========================
 
 def clean_text(text):
     if not text:
         return ""
 
-    soup = BeautifulSoup(text, "html.parser")
+    soup = BeautifulSoup(
+        text,
+        "html.parser"
+    )
 
-    text = soup.get_text(" ", strip=True)
+    text = soup.get_text(
+        " ",
+        strip=True
+    )
 
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
 
     return text.strip()
 
 
-def shorten_text(text, max_length=700):
+def shorten_text(
+    text,
+    max_length=700
+):
     text = clean_text(text)
 
     if not text:
@@ -162,41 +209,67 @@ def shorten_text(text, max_length=700):
     if len(text) <= max_length:
         return text
 
-    shortened = text[:max_length]
+    text = text[:max_length]
 
-    last_space = shortened.rfind(" ")
+    last_space = text.rfind(" ")
 
     if last_space > 400:
-        shortened = shortened[:last_space]
+        text = text[:last_space]
 
-    return shortened + "..."
+    return text + "..."
 
 
-def is_football_news(title, summary):
-    text = f"{title} {summary}".lower()
+# =========================
+# FOOTBALL FILTER
+# =========================
+
+def is_football_news(
+    title,
+    summary
+):
+    text = (
+        f"{title} {summary}"
+    ).lower()
 
     for keyword in FOOTBALL_KEYWORDS:
+
         if keyword.lower() in text:
             return True
 
     return False
 
 
-def create_hashtags(title, summary):
-    text = f"{title} {summary}"
+# =========================
+# HASHTAGS
+# =========================
+
+def create_hashtags(
+    title,
+    summary
+):
+    text = (
+        f"{title} {summary}"
+    ).lower()
 
     found = []
 
-    sorted_keywords = sorted(
+    keywords = sorted(
         HASHTAG_KEYWORDS,
         key=len,
         reverse=True
     )
 
-    for keyword in sorted_keywords:
-        if keyword.lower() in text.lower():
+    for keyword in keywords:
 
-            hashtag = "#" + keyword.replace(" ", "_")
+        if keyword.lower() in text:
+
+            hashtag = (
+                "#" +
+                keyword.replace(
+                    " ",
+                    "_"
+                )
+            )
 
             if hashtag not in found:
                 found.append(hashtag)
@@ -204,54 +277,71 @@ def create_hashtags(title, summary):
         if len(found) >= 5:
             break
 
-    if len(found) < 3 and "#فوتبال" not in found:
+    if len(found) < 3:
         found.append("#فوتبال")
 
-    if len(found) < 3 and "#اخبار_فوتبال" not in found:
+    if len(found) < 3:
         found.append("#اخبار_فوتبال")
 
-    return " ".join(found[:5])
+    return " ".join(
+        found[:5]
+    )
 
+
+# =========================
+# MEDIA FROM RSS
+# =========================
 
 def get_media_url(entry):
 
-    media_content = entry.get("media_content", [])
+    media_content = entry.get(
+        "media_content",
+        []
+    )
 
-    if media_content:
-        for media in media_content:
-            url = media.get("url")
+    for media in media_content:
 
-            if url:
-                return url
+        url = media.get("url")
 
-    media_thumbnail = entry.get("media_thumbnail", [])
+        if url:
+            return url
 
-    if media_thumbnail:
-        for media in media_thumbnail:
-            url = media.get("url")
+    media_thumbnail = entry.get(
+        "media_thumbnail",
+        []
+    )
 
-            if url:
-                return url
+    for media in media_thumbnail:
 
-    enclosures = entry.get("enclosures", [])
+        url = media.get("url")
 
-    if enclosures:
-        for enclosure in enclosures:
+        if url:
+            return url
 
-            url = (
-                enclosure.get("href")
-                or enclosure.get("url")
-            )
+    enclosures = entry.get(
+        "enclosures",
+        []
+    )
 
-            if url:
-                return url
+    for enclosure in enclosures:
 
-    html = entry.get("summary", "")
+        url = (
+            enclosure.get("href")
+            or enclosure.get("url")
+        )
 
-    if html:
+        if url:
+            return url
+
+    summary = entry.get(
+        "summary",
+        ""
+    )
+
+    if summary:
 
         soup = BeautifulSoup(
-            html,
+            summary,
             "html.parser"
         )
 
@@ -259,25 +349,29 @@ def get_media_url(entry):
 
         if image:
 
-            src = (
+            url = (
                 image.get("src")
                 or image.get("data-src")
             )
 
-            if src:
-                return src
+            if url:
+                return url
 
     return None
 
 
-def is_probable_video_url(url):
+# =========================
+# VIDEO URL CHECK
+# =========================
+
+def is_video_url(url):
 
     if not url:
         return False
 
-    url_lower = url.lower()
+    url = url.lower()
 
-    video_extensions = [
+    extensions = [
         ".mp4",
         ".m4v",
         ".mov",
@@ -286,11 +380,12 @@ def is_probable_video_url(url):
         ".mkv"
     ]
 
-    for extension in video_extensions:
-        if extension in url_lower:
+    for extension in extensions:
+
+        if extension in url:
             return True
 
-    video_words = [
+    words = [
         "/video/",
         "/videos/",
         "video_url",
@@ -299,33 +394,21 @@ def is_probable_video_url(url):
         "mp4"
     ]
 
-    for word in video_words:
-        if word in url_lower:
+    for word in words:
+
+        if word in url:
             return True
 
     return False
 
 
-def make_absolute_url(base_url, url):
+# =========================
+# VIDEO FROM ARTICLE
+# =========================
 
-    if not url:
-        return None
-
-    if url.startswith("//"):
-        return "https:" + url
-
-    if url.startswith("http://"):
-        return url
-
-    if url.startswith("https://"):
-        return url
-
-    from urllib.parse import urljoin
-
-    return urljoin(base_url, url)
-
-
-def get_video_url(article_url):
+def get_video_url(
+    article_url
+):
 
     if not article_url:
         return None
@@ -356,7 +439,9 @@ def get_video_url(article_url):
             content_type
         )
 
-        if content_type.startswith("video/"):
+        if content_type.startswith(
+            "video/"
+        ):
             return response.url
 
         soup = BeautifulSoup(
@@ -364,62 +449,89 @@ def get_video_url(article_url):
             "html.parser"
         )
 
-        og_video_names = [
+        # -------------------------
+        # OG VIDEO
+        # -------------------------
+
+        og_names = [
             "og:video",
             "og:video:url",
             "og:video:secure_url"
         ]
 
-        for name in og_video_names:
+        for name in og_names:
 
             tag = soup.find(
                 "meta",
-                attrs={"property": name}
+                attrs={
+                    "property": name
+                }
             )
 
             if not tag:
+
                 tag = soup.find(
                     "meta",
-                    attrs={"name": name}
+                    attrs={
+                        "name": name
+                    }
                 )
 
             if tag:
 
-                url = tag.get("content")
+                url = tag.get(
+                    "content"
+                )
 
                 if url:
 
-                    url = make_absolute_url(
+                    url = urljoin(
                         article_url,
                         url
                     )
 
-                    if is_probable_video_url(url):
+                    if is_video_url(
+                        url
+                    ):
 
                         print(
-                            "VIDEO FOUND IN OG:",
+                            "VIDEO FOUND OG:",
                             url
                         )
 
                         return url
 
-        videos = soup.find_all("video")
+        # -------------------------
+        # VIDEO TAG
+        # -------------------------
+
+        videos = soup.find_all(
+            "video"
+        )
 
         for video in videos:
 
             candidates = []
 
-            src = video.get("src")
+            src = video.get(
+                "src"
+            )
 
             if src:
                 candidates.append(src)
 
-            data_src = video.get("data-src")
+            data_src = video.get(
+                "data-src"
+            )
 
             if data_src:
-                candidates.append(data_src)
+                candidates.append(
+                    data_src
+                )
 
-            for source in video.find_all("source"):
+            for source in video.find_all(
+                "source"
+            ):
 
                 src = (
                     source.get("src")
@@ -431,21 +543,29 @@ def get_video_url(article_url):
 
             for url in candidates:
 
-                url = make_absolute_url(
+                url = urljoin(
                     article_url,
                     url
                 )
 
-                if is_probable_video_url(url):
+                if is_video_url(
+                    url
+                ):
 
                     print(
-                        "VIDEO FOUND IN VIDEO TAG:",
+                        "VIDEO FOUND TAG:",
                         url
                     )
 
                     return url
 
-        sources = soup.find_all("source")
+        # -------------------------
+        # SOURCE TAG
+        # -------------------------
+
+        sources = soup.find_all(
+            "source"
+        )
 
         for source in sources:
 
@@ -456,45 +576,27 @@ def get_video_url(article_url):
 
             if url:
 
-                url = make_absolute_url(
+                url = urljoin(
                     article_url,
                     url
                 )
 
-                if is_probable_video_url(url):
+                if is_video_url(
+                    url
+                ):
 
                     print(
-                        "VIDEO FOUND IN SOURCE:",
+                        "VIDEO FOUND SOURCE:",
                         url
                     )
 
                     return url
 
-        for link in soup.find_all("a", href=True):
-
-            url = link.get("href")
-
-            if url:
-
-                url = make_absolute_url(
-                    article_url,
-                    url
-                )
-
-                if is_probable_video_url(url):
-
-                    print(
-                        "VIDEO FOUND IN LINK:",
-                        url
-                    )
-
-                    return url
-
-    except Exception as e:
+    except Exception as error:
 
         print(
             "VIDEO PAGE ERROR:",
-            e
+            error
         )
 
     print(
@@ -503,6 +605,10 @@ def get_video_url(article_url):
 
     return None
 
+
+# =========================
+# GET NEWS
+# =========================
 
 def get_news():
 
@@ -532,11 +638,17 @@ def get_news():
             for entry in feed.entries:
 
                 title = clean_text(
-                    entry.get("title", "")
+                    entry.get(
+                        "title",
+                        ""
+                    )
                 )
 
                 summary = clean_text(
-                    entry.get("summary", "")
+                    entry.get(
+                        "summary",
+                        ""
+                    )
                 )
 
                 link = entry.get(
@@ -553,28 +665,30 @@ def get_news():
                 ):
                     continue
 
-                media_url = get_media_url(
-                    entry
-                )
-
                 all_news.append({
                     "title": title,
                     "summary": summary,
                     "link": link,
-                    "media_url": media_url
+                    "media_url": get_media_url(
+                        entry
+                    )
                 })
 
-        except Exception as e:
+        except Exception as error:
 
             print(
                 "RSS ERROR:",
                 rss_url
             )
 
-            print(e)
+            print(error)
 
     return all_news
 
+
+# =========================
+# MESSAGE WITH CUSTOM EMOJI
+# =========================
 
 def create_message(news):
 
@@ -590,25 +704,37 @@ def create_message(news):
     )
 
     logo = (
-        f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">'
-        f'🏆'
-        f'</tg-emoji>'
+        '<tg-emoji emoji-id="'
+        + CUSTOM_EMOJI_ID
+        + '">🏆</tg-emoji>'
     )
 
     message = (
-        f'{logo} <b>{title}</b>\n\n'
+        logo
+        + " <b>"
+        + title
+        + "</b>\n\n"
     )
 
     if summary:
-        message += f"{summary}\n\n"
+
+        message += (
+            summary
+            + "\n\n"
+        )
 
     message += (
-        f"{hashtags}\n\n"
-        f"📢 @ligebartar24"
+        hashtags
+        + "\n\n"
+        + "📢 @ligebartar24"
     )
 
     return message
 
+
+# =========================
+# SEND MEDIA
+# =========================
 
 async def send_media(
     bot,
@@ -644,7 +770,13 @@ async def send_media(
             content_type
         )
 
-        if content_type.startswith("image/"):
+        # -------------------------
+        # PHOTO
+        # -------------------------
+
+        if content_type.startswith(
+            "image/"
+        ):
 
             await bot.send_photo(
                 chat_id=CHANNEL,
@@ -659,7 +791,13 @@ async def send_media(
 
             return True
 
-        if content_type.startswith("video/"):
+        # -------------------------
+        # VIDEO
+        # -------------------------
+
+        if content_type.startswith(
+            "video/"
+        ):
 
             await bot.send_video(
                 chat_id=CHANNEL,
@@ -675,7 +813,9 @@ async def send_media(
 
             return True
 
-        if is_probable_video_url(media_url):
+        if is_video_url(
+            media_url
+        ):
 
             await bot.send_video(
                 chat_id=CHANNEL,
@@ -691,15 +831,19 @@ async def send_media(
 
             return True
 
-    except Exception as e:
+    except Exception as error:
 
         print(
             "MEDIA ERROR:",
-            e
+            error
         )
 
     return False
 
+
+# =========================
+# MAIN
+# =========================
 
 async def main():
 
@@ -722,14 +866,14 @@ async def main():
     sent_news = load_sent_news()
 
     print(
-        "تعداد اخبار ارسال شده قبلی:",
+        "SENT NEWS COUNT:",
         len(sent_news)
     )
 
     news_list = get_news()
 
     print(
-        "تعداد اخبار فوتبالی پیدا شده:",
+        "FOOTBALL NEWS FOUND:",
         len(news_list)
     )
 
@@ -749,7 +893,7 @@ async def main():
         if link in sent_news:
 
             print(
-                "SKIPPED DUPLICATE:",
+                "SKIPPED OLD NEWS:",
                 news["title"]
             )
 
@@ -770,16 +914,15 @@ async def main():
                 news["title"]
             )
 
-            print(
-                "ARTICLE URL:",
-                link
-            )
-
             video_url = get_video_url(
                 link
             )
 
             media_sent = False
+
+            # -------------------------
+            # VIDEO
+            # -------------------------
 
             if video_url:
 
@@ -800,6 +943,10 @@ async def main():
                         "✅ VIDEO NEWS SENT"
                     )
 
+            # -------------------------
+            # RSS PHOTO
+            # -------------------------
+
             if not media_sent:
 
                 rss_media = news.get(
@@ -809,7 +956,7 @@ async def main():
                 if rss_media:
 
                     print(
-                        "USING RSS MEDIA:",
+                        "TRY RSS MEDIA:",
                         rss_media
                     )
 
@@ -818,6 +965,10 @@ async def main():
                         rss_media,
                         message
                     )
+
+            # -------------------------
+            # TEXT
+            # -------------------------
 
             if not media_sent:
 
@@ -853,11 +1004,11 @@ async def main():
 
             await asyncio.sleep(2)
 
-        except Exception as e:
+        except Exception as error:
 
             print(
                 "SEND ERROR:",
-                e
+                error
             )
 
     print(
@@ -865,11 +1016,11 @@ async def main():
     )
 
     print(
-        f"✅ اجرای ربات تمام شد. "
-        f"{sent_count} خبر ارسال شد."
+        "✅ اجرای ربات تمام شد.",
+        sent_count,
+        "خبر ارسال شد."
     )
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-`
