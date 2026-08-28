@@ -10,20 +10,15 @@ from bs4 import BeautifulSoup
 from telegram import Bot
 
 
-# =========================
-# SETTINGS
-# =========================
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL")
 
 SENT_FILE = "sent_news.json"
-
 MAX_NEWS_PER_RUN = 10
 REQUEST_TIMEOUT = 20
 
-CUSTOM_EMOJI_ID = "5791832221211959289"
-
+# ID واقعی Custom Emoji لوگوی لیگ‌برتر
+CUSTOM_EMOJI_ID = "5791645007882495057"
 
 HEADERS = {
     "User-Agent": (
@@ -33,10 +28,6 @@ HEADERS = {
     )
 }
 
-
-# =========================
-# FOOTBALL KEYWORDS
-# =========================
 
 FOOTBALL_KEYWORDS = [
     "فوتبال",
@@ -75,10 +66,6 @@ FOOTBALL_KEYWORDS = [
 ]
 
 
-# =========================
-# HASHTAGS
-# =========================
-
 HASHTAG_KEYWORDS = [
     "استقلال",
     "پرسپولیس",
@@ -115,10 +102,6 @@ HASHTAG_KEYWORDS = [
 ]
 
 
-# =========================
-# RSS SOURCES
-# =========================
-
 RSS_SOURCES = [
     "https://www.isna.ir/rss",
     "https://www.khabarvarzeshi.com/rss",
@@ -126,10 +109,6 @@ RSS_SOURCES = [
     "https://www.tasnimnews.com/fa/rss",
 ]
 
-
-# =========================
-# SENT NEWS
-# =========================
 
 def load_sent_news():
     if not os.path.exists(SENT_FILE):
@@ -141,24 +120,31 @@ def load_sent_news():
             "r",
             encoding="utf-8"
         ) as file:
+
             data = json.load(file)
 
         if isinstance(data, list):
             return data
 
     except Exception as error:
-        print("LOAD SENT ERROR:", error)
+        print(
+            "LOAD SENT ERROR:",
+            error
+        )
 
     return []
 
 
 def save_sent_news(sent_news):
+
     try:
+
         with open(
             SENT_FILE,
             "w",
             encoding="utf-8"
         ) as file:
+
             json.dump(
                 sent_news[-1000:],
                 file,
@@ -167,14 +153,15 @@ def save_sent_news(sent_news):
             )
 
     except Exception as error:
-        print("SAVE SENT ERROR:", error)
 
+        print(
+            "SAVE SENT ERROR:",
+            error
+        )
 
-# =========================
-# TEXT CLEAN
-# =========================
 
 def clean_text(text):
+
     if not text:
         return ""
 
@@ -201,6 +188,7 @@ def shorten_text(
     text,
     max_length=700
 ):
+
     text = clean_text(text)
 
     if not text:
@@ -219,14 +207,11 @@ def shorten_text(
     return text + "..."
 
 
-# =========================
-# FOOTBALL FILTER
-# =========================
-
 def is_football_news(
     title,
     summary
 ):
+
     text = (
         f"{title} {summary}"
     ).lower()
@@ -239,14 +224,11 @@ def is_football_news(
     return False
 
 
-# =========================
-# HASHTAGS
-# =========================
-
 def create_hashtags(
     title,
     summary
 ):
+
     text = (
         f"{title} {summary}"
     ).lower()
@@ -264,8 +246,8 @@ def create_hashtags(
         if keyword.lower() in text:
 
             hashtag = (
-                "#" +
-                keyword.replace(
+                "#"
+                + keyword.replace(
                     " ",
                     "_"
                 )
@@ -278,19 +260,19 @@ def create_hashtags(
             break
 
     if len(found) < 3:
-        found.append("#فوتبال")
+
+        if "#فوتبال" not in found:
+            found.append("#فوتبال")
 
     if len(found) < 3:
-        found.append("#اخبار_فوتبال")
+
+        if "#اخبار_فوتبال" not in found:
+            found.append("#اخبار_فوتبال")
 
     return " ".join(
         found[:5]
     )
 
-
-# =========================
-# MEDIA FROM RSS
-# =========================
 
 def get_media_url(entry):
 
@@ -301,7 +283,9 @@ def get_media_url(entry):
 
     for media in media_content:
 
-        url = media.get("url")
+        url = media.get(
+            "url"
+        )
 
         if url:
             return url
@@ -313,7 +297,9 @@ def get_media_url(entry):
 
     for media in media_thumbnail:
 
-        url = media.get("url")
+        url = media.get(
+            "url"
+        )
 
         if url:
             return url
@@ -345,7 +331,9 @@ def get_media_url(entry):
             "html.parser"
         )
 
-        image = soup.find("img")
+        image = soup.find(
+            "img"
+        )
 
         if image:
 
@@ -359,10 +347,6 @@ def get_media_url(entry):
 
     return None
 
-
-# =========================
-# VIDEO URL CHECK
-# =========================
 
 def is_video_url(url):
 
@@ -402,10 +386,6 @@ def is_video_url(url):
     return False
 
 
-# =========================
-# VIDEO FROM ARTICLE
-# =========================
-
 def get_video_url(
     article_url
 ):
@@ -442,16 +422,13 @@ def get_video_url(
         if content_type.startswith(
             "video/"
         ):
+
             return response.url
 
         soup = BeautifulSoup(
             response.text,
             "html.parser"
         )
-
-        # -------------------------
-        # OG VIDEO
-        # -------------------------
 
         og_names = [
             "og:video",
@@ -501,10 +478,6 @@ def get_video_url(
 
                         return url
 
-        # -------------------------
-        # VIDEO TAG
-        # -------------------------
-
         videos = soup.find_all(
             "video"
         )
@@ -518,7 +491,9 @@ def get_video_url(
             )
 
             if src:
-                candidates.append(src)
+                candidates.append(
+                    src
+                )
 
             data_src = video.get(
                 "data-src"
@@ -539,7 +514,9 @@ def get_video_url(
                 )
 
                 if src:
-                    candidates.append(src)
+                    candidates.append(
+                        src
+                    )
 
             for url in candidates:
 
@@ -558,10 +535,6 @@ def get_video_url(
                     )
 
                     return url
-
-        # -------------------------
-        # SOURCE TAG
-        # -------------------------
 
         sources = soup.find_all(
             "source"
@@ -605,10 +578,6 @@ def get_video_url(
 
     return None
 
-
-# =========================
-# GET NEWS
-# =========================
 
 def get_news():
 
@@ -681,14 +650,12 @@ def get_news():
                 rss_url
             )
 
-            print(error)
+            print(
+                error
+            )
 
     return all_news
 
-
-# =========================
-# MESSAGE WITH CUSTOM EMOJI
-# =========================
 
 def create_message(news):
 
@@ -706,7 +673,7 @@ def create_message(news):
     logo = (
         '<tg-emoji emoji-id="'
         + CUSTOM_EMOJI_ID
-        + '">🏆</tg-emoji>'
+        + '">⚽️</tg-emoji>'
     )
 
     message = (
@@ -731,10 +698,6 @@ def create_message(news):
 
     return message
 
-
-# =========================
-# SEND MEDIA
-# =========================
 
 async def send_media(
     bot,
@@ -770,10 +733,6 @@ async def send_media(
             content_type
         )
 
-        # -------------------------
-        # PHOTO
-        # -------------------------
-
         if content_type.startswith(
             "image/"
         ):
@@ -790,10 +749,6 @@ async def send_media(
             )
 
             return True
-
-        # -------------------------
-        # VIDEO
-        # -------------------------
 
         if content_type.startswith(
             "video/"
@@ -840,10 +795,6 @@ async def send_media(
 
     return False
 
-
-# =========================
-# MAIN
-# =========================
 
 async def main():
 
@@ -920,10 +871,6 @@ async def main():
 
             media_sent = False
 
-            # -------------------------
-            # VIDEO
-            # -------------------------
-
             if video_url:
 
                 print(
@@ -943,10 +890,6 @@ async def main():
                         "✅ VIDEO NEWS SENT"
                     )
 
-            # -------------------------
-            # RSS PHOTO
-            # -------------------------
-
             if not media_sent:
 
                 rss_media = news.get(
@@ -965,10 +908,6 @@ async def main():
                         rss_media,
                         message
                     )
-
-            # -------------------------
-            # TEXT
-            # -------------------------
 
             if not media_sent:
 
@@ -1016,11 +955,10 @@ async def main():
     )
 
     print(
-        "✅ اجرای ربات تمام شد.",
-        sent_count,
-        "خبر ارسال شد."
+        f"✅ اجرای ربات تمام شد. "
+        f"{sent_count} خبر ارسال شد."
     )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main()
