@@ -14,26 +14,67 @@ jobs:
           python-version: "3.11"
 
       - name: Install Telegram library
-        run: pip install python-telegram-bot==20.8
-
-      - name: Create test script
         run: |
-          cat > test_telegram.py <<'PY'
+          pip install python-telegram-bot==20.8
+
+      - name: Create inspect script
+        run: |
+          cat > inspect_emoji.py <<'PY'
           import os
           import asyncio
           from telegram import Bot
 
-          async def main():
-              bot = Bot(token=os.environ["BOT_TOKEN"])
-              me = await bot.get_me()
-              print("BOT OK")
-              print("Username:", me.username)
-              print("ID:", me.id)
+          BOT_TOKEN = os.environ["BOT_TOKEN"]
 
-          asyncio.run(main())
+          # نام پک Custom Emoji
+          SET_NAME = "LigaBartar24Emoji"
+
+          async def main():
+              bot = Bot(token=BOT_TOKEN)
+
+              print("================================")
+              print("INSPECTING TELEGRAM CUSTOM EMOJI")
+              print("================================")
+              print("Set name:", SET_NAME)
+              print()
+
+              try:
+                  sticker_set = await bot.get_sticker_set(SET_NAME)
+
+                  print("SET FOUND")
+                  print("Title:", sticker_set.title)
+                  print("Name:", sticker_set.name)
+                  print("Sticker count:", len(sticker_set.stickers))
+                  print()
+
+                  for i, sticker in enumerate(sticker_set.stickers, 1):
+                      print("--------------------------------")
+                      print("Emoji #", i)
+                      print("Emoji:", sticker.emoji)
+                      print("File ID:", sticker.file_id)
+                      print("File unique ID:", sticker.file_unique_id)
+                      print("Is animated:", sticker.is_animated)
+                      print("Is video:", sticker.is_video)
+                      print("Type:", sticker.type)
+                      print("Custom Emoji ID:", sticker.custom_emoji_id)
+
+                  print("--------------------------------")
+                  print("INSPECTION COMPLETE")
+
+              except Exception as e:
+                  print("ERROR:")
+                  print(type(e).__name__)
+                  print(str(e))
+
+              finally:
+                  await bot.close()
+
+          if __name__ == "__main__":
+              asyncio.run(main())
           PY
 
-      - name: Run python
+      - name: Run inspection
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        run: python test_telegram.p
+        run: |
+          python inspect_emoji.py
