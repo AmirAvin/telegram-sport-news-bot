@@ -1,15 +1,37 @@
-name: Check LigaBartar Emoji
+name: Get Animated Emoji ID
 
 on:
   workflow_dispatch:
 
 jobs:
-  check:
+  get-emoji:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check Custom Emoji
+      - name: Get Emoji ID
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          python -c "import os,requests; r=requests.get('https://api.telegram.org/bot'+os.environ['BOT_TOKEN']+'/getCustomEmojiStickers', params={'custom_emoji_ids':'[\"5791645007882495057\"]'}); print('STATUS:',r.status_code); print(r.text); r.raise_for_status()"
+          python - <<'PY'
+          import os
+          import requests
+
+          token = os.environ["BOT_TOKEN"]
+
+          url = f"https://api.telegram.org/bot{token}/getCustomEmojiStickers"
+
+          emoji_ids = [
+              "5791645007882495057"
+          ]
+
+          response = requests.post(
+              url,
+              data={
+                  "custom_emoji_ids": str(emoji_ids)
+              },
+              timeout=30
+          )
+
+          print("STATUS:", response.status_code)
+          print(response.text)
+          PY
