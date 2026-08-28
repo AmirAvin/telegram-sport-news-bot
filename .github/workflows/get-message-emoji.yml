@@ -1,14 +1,14 @@
-name: Get Animated Emoji From Bot
+name: Check Animated Emoji
 
 on:
   workflow_dispatch:
 
 jobs:
-  get-emoji:
+  check:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Read Telegram Message
+      - name: Check Emoji
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
@@ -18,41 +18,23 @@ jobs:
           import json
 
           token = os.environ["BOT_TOKEN"]
+          emoji_id = "5220181540222291016"
 
-          url = f"https://api.telegram.org/bot{token}/getUpdates"
+          url = f"https://api.telegram.org/bot{token}/getCustomEmojiStickers"
 
           response = requests.get(
               url,
-              params={"limit": 20},
+              params={
+                  "custom_emoji_ids": json.dumps([emoji_id])
+              },
               timeout=30
           )
 
           print("STATUS:", response.status_code)
-
-          data = response.json()
-
-          if not data.get("ok"):
-              print(data)
-              raise SystemExit(1)
-
+          print("================================")
+          print(response.text)
           print("================================")
 
-          for update in data.get("result", []):
-              message = update.get("message", {})
-
-              if not message:
-                  continue
-
-              print("MESSAGE ID:", message.get("message_id"))
-              print("TEXT:", repr(message.get("text", "")))
-              print(
-                  "ENTITIES:",
-                  json.dumps(
-                      message.get("entities", []),
-                      ensure_ascii=False,
-                      indent=2
-                  )
-              )
-
-              print("================================")
+          if not response.ok:
+              raise SystemExit(1)
           PY
