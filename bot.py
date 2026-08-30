@@ -1477,6 +1477,5 @@ async def main():
 # RUN
 # ============================================================
 
-if __name__ == "__main__":
-
-    asyncio.run(
+if __nif __name__ == "__main__":
+    asyncio.run(main())
