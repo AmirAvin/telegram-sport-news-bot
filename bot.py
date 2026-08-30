@@ -20,18 +20,15 @@ CHANNEL = os.getenv("CHANNEL")
 SENT_FILE = "sent_news.json"
 
 MAX_NEWS_PER_RUN = 10
-
-REQUEST_TIMEOUT = 30
+REQUEST_TIMEOUT = 25
 
 CUSTOM_EMOJI_ID = "5231262796364137694"
-
 
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/120.0 Safari/537.36"
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
     )
 }
 
@@ -67,9 +64,7 @@ FOOTBALL_KEYWORDS = [
     "رئال مادرید",
     "بارسلونا",
     "منچستریونایتد",
-    "منچستر یونایتد",
     "منچسترسیتی",
-    "منچستر سیتی",
     "لیورپول",
     "چلسی",
     "آرسنال",
@@ -78,7 +73,9 @@ FOOTBALL_KEYWORDS = [
     "میلان",
     "یوونتوس",
     "پاری سن ژرمن",
-    "پاری‌سن‌ژرمن",
+    "پاری‌سن ژرمن",
+    "داربی",
+    "دربی"
 ]
 
 
@@ -110,9 +107,7 @@ HASHTAG_KEYWORDS = [
     "رئال مادرید",
     "بارسلونا",
     "منچستریونایتد",
-    "منچستر یونایتد",
     "منچسترسیتی",
-    "منچستر سیتی",
     "لیورپول",
     "چلسی",
     "آرسنال",
@@ -121,9 +116,9 @@ HASHTAG_KEYWORDS = [
     "میلان",
     "یوونتوس",
     "پاری سن ژرمن",
-    "پاری‌سن‌ژرمن",
+    "پاری‌سن ژرمن",
     "فوتبال ایران",
-    "فوتبال اروپا",
+    "فوتبال اروپا"
 ]
 
 
@@ -135,7 +130,7 @@ RSS_SOURCES = [
     "https://www.isna.ir/rss",
     "https://www.khabarvarzeshi.com/rss",
     "https://www.varzesh3.com/rss",
-    "https://www.tasnimnews.com/fa/rss",
+    "https://www.tasnimnews.com/fa/rss"
 ]
 
 
@@ -144,12 +139,10 @@ RSS_SOURCES = [
 # ============================================================
 
 def load_sent_news():
-
     if not os.path.exists(SENT_FILE):
         return []
 
     try:
-
         with open(
             SENT_FILE,
             "r",
@@ -162,11 +155,7 @@ def load_sent_news():
             return data
 
     except Exception as error:
-
-        print(
-            "LOAD SENT ERROR:",
-            error
-        )
+        print("LOAD SENT ERROR:", error)
 
     return []
 
@@ -174,7 +163,6 @@ def load_sent_news():
 def save_sent_news(sent_news):
 
     try:
-
         with open(
             SENT_FILE,
             "w",
@@ -189,11 +177,7 @@ def save_sent_news(sent_news):
             )
 
     except Exception as error:
-
-        print(
-            "SAVE SENT ERROR:",
-            error
-        )
+        print("SAVE SENT ERROR:", error)
 
 
 # ============================================================
@@ -258,7 +242,8 @@ def is_football_news(
 
     text = (
         f"{title} {summary}"
-    ).lower()
+        .lower()
+    )
 
     for keyword in FOOTBALL_KEYWORDS:
 
@@ -279,7 +264,8 @@ def create_hashtags(
 
     text = (
         f"{title} {summary}"
-    ).lower()
+        .lower()
+    )
 
     found = []
 
@@ -299,6 +285,10 @@ def create_hashtags(
                     " ",
                     "_"
                 )
+                .replace(
+                    "‌",
+                    ""
+                )
             )
 
             if hashtag not in found:
@@ -317,9 +307,7 @@ def create_hashtags(
         len(found) < 3
         and "#اخبار_فوتبال" not in found
     ):
-        found.append(
-            "#اخبار_فوتبال"
-        )
+        found.append("#اخبار_فوتبال")
 
     return " ".join(
         found[:5]
@@ -383,9 +371,7 @@ def get_media_url(entry):
             "html.parser"
         )
 
-        image = soup.find(
-            "img"
-        )
+        image = soup.find("img")
 
         if image:
 
@@ -417,7 +403,7 @@ def is_video_url(url):
         ".mov",
         ".webm",
         ".avi",
-        ".mkv",
+        ".mkv"
     ]
 
     for extension in extensions:
@@ -426,12 +412,12 @@ def is_video_url(url):
             return True
 
     words = [
+        "mp4",
         "/video/",
         "/videos/",
         "video_url",
         "video-url",
-        "videourl",
-        "mp4",
+        "videourl"
     ]
 
     for word in words:
@@ -443,99 +429,125 @@ def is_video_url(url):
 
 
 # ============================================================
-# EXTRACT APARAT HASH
+# APARAT VIDEO HASH
 # ============================================================
 
 def extract_aparat_hash(
-    html,
-    article_url
+    article_url,
+    html
 ):
 
     # --------------------------------------------------------
-    # 1. Aparat URL
+    # 1. URLهای iframe
     # --------------------------------------------------------
 
-    patterns = [
+    iframe_matches = re.findall(
+        r'<iframe[^>]+src=["\']([^"\']+)["\']',
+        html,
+        flags=re.IGNORECASE
+    )
 
-        r"aparat\.com/(?:v|video)/([A-Za-z0-9_-]+)",
+    for iframe_url in iframe_matches:
 
-        r"aparat\.com/video/video/embed/videohash/([A-Za-z0-9_-]+)",
+        if "aparat.com" not in iframe_url.lower():
+            continue
 
-        r"aparat\.com/(?:api/fa/v1/v)/([A-Za-z0-9_-]+)",
+        print(
+            "APARAT IFRAME:",
+            iframe_url
+        )
 
-        r"videohash[=/]([A-Za-z0-9_-]+)",
-    ]
+        # حالت صحیح:
+        # /video/video/embed/videohash/mxh0449
 
-    for pattern in patterns:
-
-        matches = re.findall(
-            pattern,
-            html,
+        match = re.search(
+            r'videohash/([A-Za-z0-9_-]+)',
+            iframe_url,
             flags=re.IGNORECASE
         )
 
-        for value in matches:
+        if match:
 
-            if value:
+            video_hash = match.group(1)
+
+            # جلوگیری از گرفتن کلمه video
+            if video_hash.lower() != "video":
 
                 print(
                     "APARAT VIDEO HASH FOUND:",
-                    value
+                    video_hash
                 )
 
-                return value
+                return video_hash
+
+        # بعضی صفحات:
+        # /v/mxh0449
+
+        match = re.search(
+            r'aparat\.com/(?:v|video)/([A-Za-z0-9_-]+)',
+            iframe_url,
+            flags=re.IGNORECASE
+        )
+
+        if match:
+
+            video_hash = match.group(1)
+
+            if video_hash.lower() != "video":
+
+                print(
+                    "APARAT VIDEO HASH FOUND:",
+                    video_hash
+                )
+
+                return video_hash
 
     # --------------------------------------------------------
-    # 2. iframe
+    # 2. جستجوی videohash در کل HTML
     # --------------------------------------------------------
 
-    soup = BeautifulSoup(
+    matches = re.findall(
+        r'videohash[/"\':= ]+([A-Za-z0-9_-]+)',
         html,
-        "html.parser"
+        flags=re.IGNORECASE
     )
 
-    for iframe in soup.find_all(
-        "iframe"
-    ):
+    for video_hash in matches:
 
-        src = iframe.get("src")
-
-        if not src:
+        if video_hash.lower() == "video":
             continue
 
-        match = re.search(
-            r"videohash/([A-Za-z0-9_-]+)",
-            src,
-            flags=re.IGNORECASE
+        if len(video_hash) < 4:
+            continue
+
+        print(
+            "APARAT VIDEO HASH FOUND:",
+            video_hash
         )
 
-        if match:
+        return video_hash
 
-            value = match.group(1)
+    # --------------------------------------------------------
+    # 3. لینک aparat.com/v/...
+    # --------------------------------------------------------
 
-            print(
-                "APARAT IFRAME HASH FOUND:",
-                value
-            )
+    matches = re.findall(
+        r'https?://(?:www\.)?aparat\.com/v/([A-Za-z0-9_-]+)',
+        html,
+        flags=re.IGNORECASE
+    )
 
-            return value
+    for video_hash in matches:
 
-        match = re.search(
-            r"aparat\.com/(?:v|video)/([A-Za-z0-9_-]+)",
-            src,
-            flags=re.IGNORECASE
+        if video_hash.lower() == "video":
+            continue
+
+        print(
+            "APARAT VIDEO HASH FOUND:",
+            video_hash
         )
 
-        if match:
-
-            value = match.group(1)
-
-            print(
-                "APARAT IFRAME HASH FOUND:",
-                value
-            )
-
-            return value
+        return video_hash
 
     return None
 
@@ -544,7 +556,7 @@ def extract_aparat_hash(
 # APARAT API
 # ============================================================
 
-def get_aparat_video_url(
+def get_aparat_video(
     video_hash
 ):
 
@@ -576,15 +588,14 @@ def get_aparat_video_url(
             response.status_code
         )
 
-        print(
-            "APARAT API CONTENT TYPE:",
-            response.headers.get(
-                "content-type",
-                ""
-            )
-        )
+        if response.status_code != 200:
 
-        response.raise_for_status()
+            print(
+                "APARAT API ERROR:",
+                response.text[:300]
+            )
+
+            return None
 
         data = response.json()
 
@@ -594,79 +605,71 @@ def get_aparat_video_url(
             .get("attributes", {})
         )
 
+        if not attributes:
+
+            print(
+                "APARAT ATTRIBUTES NOT FOUND"
+            )
+
+            return None
+
         title = attributes.get(
             "title",
             ""
         )
 
-        if title:
-
-            print(
-                "APARAT TITLE:",
-                title
-            )
-
-        process = attributes.get(
-            "process",
+        duration = attributes.get(
+            "duration",
             ""
         )
 
         print(
-            "APARAT PROCESS:",
-            process
+            "APARAT TITLE:",
+            title
+        )
+
+        print(
+            "APARAT DURATION:",
+            duration
         )
 
         # ----------------------------------------------------
         # file_link_all
         # ----------------------------------------------------
 
-        file_links = attributes.get(
+        file_link_all = attributes.get(
             "file_link_all",
             []
         )
 
-        if not isinstance(
-            file_links,
-            list
-        ):
-            file_links = []
+        if file_link_all:
 
-        # Prefer higher quality
-        preferred_profiles = [
-            "720p",
-            "480p",
-            "360p",
-            "240p",
-            "144p",
-        ]
+            # اول کیفیت 240p
+            profiles = sorted(
+                file_link_all,
+                key=lambda item: (
+                    0
+                    if item.get("profile") == "240p"
+                    else 1
+                )
+            )
 
-        for profile in preferred_profiles:
+            for profile in profiles:
 
-            for item in file_links:
-
-                item_profile = str(
-                    item.get(
-                        "profile",
-                        ""
-                    )
+                profile_name = profile.get(
+                    "profile",
+                    ""
                 )
 
-                if (
-                    item_profile
-                    != profile
-                ):
-                    continue
-
-                urls = item.get(
+                urls = profile.get(
                     "urls",
                     []
                 )
 
-                if not isinstance(
-                    urls,
-                    list
-                ):
-                    continue
+                print(
+                    "APARAT PROFILE:",
+                    profile_name
+                )
 
                 for url in urls:
 
@@ -675,67 +678,32 @@ def get_aparat_video_url(
 
                     print(
                         "APARAT MP4 FOUND:",
-                        profile
-                    )
-
-                    print(
-                        "APARAT MP4 URL:",
-                        url
+                        profile_name
                     )
 
                     return url
 
         # ----------------------------------------------------
-        # Fallback: any URL
+        # fallback: file_link
         # ----------------------------------------------------
 
-        for item in file_links:
-
-            urls = item.get(
-                "urls",
-                []
-            )
-
-            if not isinstance(
-                urls,
-                list
-            ):
-                continue
-
-            for url in urls:
-
-                if url:
-
-                    print(
-                        "APARAT MP4 FOUND:",
-                        item.get(
-                            "profile",
-                            "unknown"
-                        )
-                    )
-
-                    print(
-                        "APARAT MP4 URL:",
-                        url
-                    )
-
-                    return url
-
-        # ----------------------------------------------------
-        # Final fallback
-        # ----------------------------------------------------
-
-        direct_file = attributes.get(
+        file_link = attributes.get(
             "file_link"
         )
 
-        if direct_file:
+        if file_link:
 
-            print(
-                "APARAT FILE LINK FOUND"
-            )
+            if is_video_url(file_link):
 
-            return direct_file
+                print(
+                    "APARAT FILE LINK FOUND"
+                )
+
+                return file_link
+
+        print(
+            "APARAT MP4 NOT FOUND"
+        )
 
     except Exception as error:
 
@@ -748,7 +716,7 @@ def get_aparat_video_url(
 
 
 # ============================================================
-# FIND VIDEO IN ARTICLE
+# GET VIDEO FROM ARTICLE
 # ============================================================
 
 def get_video_url(
@@ -772,16 +740,22 @@ def get_video_url(
             response.status_code
         )
 
-        response.raise_for_status()
-
-        content_type = response.headers.get(
-            "content-type",
-            ""
-        ).lower()
-
         print(
             "ARTICLE CONTENT TYPE:",
-            content_type
+            response.headers.get(
+                "content-type",
+                ""
+            )
+        )
+
+        response.raise_for_status()
+
+        content_type = (
+            response.headers.get(
+                "content-type",
+                ""
+            )
+            .lower()
         )
 
         # ----------------------------------------------------
@@ -800,42 +774,42 @@ def get_video_url(
 
         html = response.text
 
-        # ----------------------------------------------------
-        # APARAT
-        # ----------------------------------------------------
-
-        aparat_hash = extract_aparat_hash(
-            html,
-            article_url
-        )
-
-        if aparat_hash:
-
-            video_url = get_aparat_video_url(
-                aparat_hash
-            )
-
-            if video_url:
-
-                print(
-                    "✅ APARAT VIDEO READY"
-                )
-
-                return video_url
-
-        # ----------------------------------------------------
-        # OG VIDEO
-        # ----------------------------------------------------
-
         soup = BeautifulSoup(
             html,
             "html.parser"
         )
 
+        # ----------------------------------------------------
+        # APARAT
+        # ----------------------------------------------------
+
+        video_hash = extract_aparat_hash(
+            article_url,
+            html
+        )
+
+        if video_hash:
+
+            aparat_url = get_aparat_video(
+                video_hash
+            )
+
+            if aparat_url:
+
+                print(
+                    "✅ APARAT MP4 URL FOUND"
+                )
+
+                return aparat_url
+
+        # ----------------------------------------------------
+        # OpenGraph video
+        # ----------------------------------------------------
+
         og_names = [
             "og:video",
             "og:video:url",
-            "og:video:secure_url",
+            "og:video:secure_url"
         ]
 
         for name in og_names:
@@ -869,9 +843,7 @@ def get_video_url(
                         url
                     )
 
-                    if is_video_url(
-                        url
-                    ):
+                    if is_video_url(url):
 
                         print(
                             "VIDEO FOUND OG:",
@@ -881,7 +853,7 @@ def get_video_url(
                         return url
 
         # ----------------------------------------------------
-        # VIDEO TAGS
+        # VIDEO TAG
         # ----------------------------------------------------
 
         videos = soup.find_all(
@@ -892,9 +864,7 @@ def get_video_url(
 
             candidates = []
 
-            src = video.get(
-                "src"
-            )
+            src = video.get("src")
 
             if src:
                 candidates.append(src)
@@ -914,13 +884,13 @@ def get_video_url(
 
                 src = (
                     source.get("src")
-                    or source.get("data-src")
+                    or source.get(
+                        "data-src"
+                    )
                 )
 
                 if src:
-                    candidates.append(
-                        src
-                    )
+                    candidates.append(src)
 
             for url in candidates:
 
@@ -929,9 +899,7 @@ def get_video_url(
                     url
                 )
 
-                if is_video_url(
-                    url
-                ):
+                if is_video_url(url):
 
                     print(
                         "VIDEO FOUND TAG:",
@@ -941,7 +909,7 @@ def get_video_url(
                     return url
 
         # ----------------------------------------------------
-        # SOURCE TAGS
+        # SOURCE TAG
         # ----------------------------------------------------
 
         sources = soup.find_all(
@@ -955,23 +923,22 @@ def get_video_url(
                 or source.get("data-src")
             )
 
-            if url:
+            if not url:
+                continue
 
-                url = urljoin(
-                    article_url,
+            url = urljoin(
+                article_url,
+                url
+            )
+
+            if is_video_url(url):
+
+                print(
+                    "VIDEO FOUND SOURCE:",
                     url
                 )
 
-                if is_video_url(
-                    url
-                ):
-
-                    print(
-                        "VIDEO FOUND SOURCE:",
-                        url
-                    )
-
-                    return url
+                return url
 
     except Exception as error:
 
@@ -1010,7 +977,7 @@ def get_news():
 
             response = requests.get(
                 rss_url,
-                timeout=20,
+                timeout=15,
                 headers=HEADERS
             )
 
@@ -1055,16 +1022,14 @@ def get_news():
                 ):
                     continue
 
-                all_news.append(
-                    {
-                        "title": title,
-                        "summary": summary,
-                        "link": link,
-                        "media_url": get_media_url(
-                            entry
-                        ),
-                    }
-                )
+                all_news.append({
+                    "title": title,
+                    "summary": summary,
+                    "link": link,
+                    "media_url": get_media_url(
+                        entry
+                    )
+                })
 
         except Exception as error:
 
@@ -1081,10 +1046,12 @@ def get_news():
 
 
 # ============================================================
-# MESSAGE
+# CREATE MESSAGE
 # ============================================================
 
-def create_message(news):
+def create_message(
+    news
+):
 
     title = news["title"]
 
@@ -1127,15 +1094,17 @@ def create_message(news):
 
 
 # ============================================================
-# DOWNLOAD MEDIA
+# SEND MEDIA
 # ============================================================
 
-def download_media(
-    media_url
+async def send_media(
+    bot,
+    media_url,
+    caption
 ):
 
     if not media_url:
-        return None, ""
+        return False
 
     try:
 
@@ -1143,6 +1112,43 @@ def download_media(
             "MEDIA URL:",
             media_url
         )
+
+        # ----------------------------------------------------
+        # HEAD
+        # ----------------------------------------------------
+
+        try:
+
+            head = requests.head(
+                media_url,
+                timeout=REQUEST_TIMEOUT,
+                headers=HEADERS,
+                allow_redirects=True
+            )
+
+            print(
+                "MEDIA HEAD STATUS:",
+                head.status_code
+            )
+
+            print(
+                "MEDIA HEAD TYPE:",
+                head.headers.get(
+                    "content-type",
+                    ""
+                )
+            )
+
+        except Exception as head_error:
+
+            print(
+                "MEDIA HEAD ERROR:",
+                head_error
+            )
+
+        # ----------------------------------------------------
+        # GET
+        # ----------------------------------------------------
 
         response = requests.get(
             media_url,
@@ -1158,10 +1164,13 @@ def download_media(
 
         response.raise_for_status()
 
-        content_type = response.headers.get(
-            "content-type",
-            ""
-        ).lower()
+        content_type = (
+            response.headers.get(
+                "content-type",
+                ""
+            )
+            .lower()
+        )
 
         print(
             "MEDIA CONTENT TYPE:",
@@ -1173,43 +1182,6 @@ def download_media(
             len(response.content)
         )
 
-        return (
-            response.content,
-            content_type
-        )
-
-    except Exception as error:
-
-        print(
-            "MEDIA DOWNLOAD ERROR:",
-            error
-        )
-
-        return None, ""
-
-
-# ============================================================
-# SEND MEDIA
-# ============================================================
-
-async def send_media(
-    bot,
-    media_url,
-    caption
-):
-
-    if not media_url:
-        return False
-
-    data, content_type = download_media(
-        media_url
-    )
-
-    if not data:
-        return False
-
-    try:
-
         # ----------------------------------------------------
         # IMAGE
         # ----------------------------------------------------
@@ -1220,7 +1192,7 @@ async def send_media(
 
             await bot.send_photo(
                 chat_id=CHANNEL,
-                photo=data,
+                photo=response.content,
                 caption=caption,
                 parse_mode="HTML"
             )
@@ -1241,7 +1213,7 @@ async def send_media(
 
             await bot.send_video(
                 chat_id=CHANNEL,
-                video=data,
+                video=response.content,
                 caption=caption,
                 parse_mode="HTML",
                 supports_streaming=True
@@ -1254,7 +1226,7 @@ async def send_media(
             return True
 
         # ----------------------------------------------------
-        # URL SAYS VIDEO
+        # URL says video
         # ----------------------------------------------------
 
         if is_video_url(
@@ -1263,7 +1235,7 @@ async def send_media(
 
             await bot.send_video(
                 chat_id=CHANNEL,
-                video=data,
+                video=response.content,
                 caption=caption,
                 parse_mode="HTML",
                 supports_streaming=True
@@ -1278,7 +1250,7 @@ async def send_media(
     except Exception as error:
 
         print(
-            "SEND MEDIA ERROR:",
+            "MEDIA ERROR:",
             error
         )
 
@@ -1291,6 +1263,22 @@ async def send_media(
 
 async def main():
 
+    print(
+        "================================"
+    )
+
+    print(
+        "TELEGRAM SPORTS NEWS BOT"
+    )
+
+    print(
+        "================================"
+    )
+
+    # --------------------------------------------------------
+    # BOT TOKEN
+    # --------------------------------------------------------
+
     if not BOT_TOKEN:
 
         print(
@@ -1298,6 +1286,10 @@ async def main():
         )
 
         return
+
+    # --------------------------------------------------------
+    # CHANNEL
+    # --------------------------------------------------------
 
     if not CHANNEL:
 
@@ -1307,6 +1299,10 @@ async def main():
 
         return
 
+    # --------------------------------------------------------
+    # SENT
+    # --------------------------------------------------------
+
     sent_news = load_sent_news()
 
     print(
@@ -1314,9 +1310,9 @@ async def main():
         len(sent_news)
     )
 
-    print(
-        "================================"
-    )
+    # --------------------------------------------------------
+    # NEWS
+    # --------------------------------------------------------
 
     news_list = get_news()
 
@@ -1325,11 +1321,19 @@ async def main():
         len(news_list)
     )
 
+    # --------------------------------------------------------
+    # BOT
+    # --------------------------------------------------------
+
     bot = Bot(
         token=BOT_TOKEN
     )
 
     sent_count = 0
+
+    # --------------------------------------------------------
+    # PROCESS
+    # --------------------------------------------------------
 
     for news in news_list:
 
@@ -1337,6 +1341,10 @@ async def main():
             break
 
         link = news["link"]
+
+        # ----------------------------------------------------
+        # DUPLICATE
+        # ----------------------------------------------------
 
         if link in sent_news:
 
@@ -1360,108 +1368,106 @@ async def main():
             news
         )
 
-        try:
+        media_sent = False
 
-            media_sent = False
+        # ----------------------------------------------------
+        # VIDEO
+        # ----------------------------------------------------
 
-            # =================================================
-            # 1. TRY VIDEO
-            # =================================================
+        video_url = get_video_url(
+            link
+        )
 
-            video_url = get_video_url(
-                link
+        if video_url:
+
+            print(
+                "VIDEO FOUND:"
             )
 
-            if video_url:
+            print(
+                video_url
+            )
+
+            media_sent = await send_media(
+                bot,
+                video_url,
+                message
+            )
+
+            if media_sent:
 
                 print(
-                    "VIDEO FOUND:",
-                    video_url
+                    "✅ VIDEO NEWS SENT"
+                )
+
+        # ----------------------------------------------------
+        # RSS IMAGE
+        # ----------------------------------------------------
+
+        if not media_sent:
+
+            rss_media = news.get(
+                "media_url"
+            )
+
+            if rss_media:
+
+                print(
+                    "TRY RSS MEDIA:",
+                    rss_media
                 )
 
                 media_sent = await send_media(
                     bot,
-                    video_url,
+                    rss_media,
                     message
                 )
 
-                if media_sent:
+        # ----------------------------------------------------
+        # TEXT
+        # ----------------------------------------------------
 
-                    print(
-                        "✅ VIDEO NEWS SENT"
-                    )
-
-            # =================================================
-            # 2. TRY RSS IMAGE
-            # =================================================
-
-            if not media_sent:
-
-                rss_media = news.get(
-                    "media_url"
-                )
-
-                if rss_media:
-
-                    print(
-                        "TRY RSS MEDIA:",
-                        rss_media
-                    )
-
-                    media_sent = await send_media(
-                        bot,
-                        rss_media,
-                        message
-                    )
-
-            # =================================================
-            # 3. TEXT
-            # =================================================
-
-            if not media_sent:
-
-                print(
-                    "NO MEDIA - SENDING TEXT"
-                )
-
-                await bot.send_message(
-                    chat_id=CHANNEL,
-                    text=message,
-                    parse_mode="HTML",
-                    disable_web_page_preview=True
-                )
-
-                print(
-                    "✅ TEXT SENT"
-                )
-
-            # =================================================
-            # SAVE
-            # =================================================
-
-            sent_news.append(
-                link
-            )
-
-            save_sent_news(
-                sent_news
-            )
-
-            sent_count += 1
+        if not media_sent:
 
             print(
-                "NEWS SENT:",
-                news["title"]
+                "NO MEDIA - SENDING TEXT"
             )
 
-            await asyncio.sleep(2)
-
-        except Exception as error:
+            await bot.send_message(
+                chat_id=CHANNEL,
+                text=message,
+                parse_mode="HTML",
+                disable_web_page_preview=True
+            )
 
             print(
-                "SEND ERROR:",
-                error
+                "✅ TEXT SENT"
             )
+
+        # ----------------------------------------------------
+        # SAVE
+        # ----------------------------------------------------
+
+        sent_news.append(
+            link
+        )
+
+        save_sent_news(
+            sent_news
+        )
+
+        sent_count += 1
+
+        print(
+            "NEWS SENT:",
+            news["title"]
+        )
+
+        await asyncio.sleep(2)
+
+    # --------------------------------------------------------
+    # FINISHED
+    # --------------------------------------------------------
 
     print(
         "================================"
@@ -1472,10 +1478,14 @@ async def main():
         f"{sent_count} خبر ارسال شد."
     )
 
+    print(
+        "================================"
+    )
+
 
 # ============================================================
-# RUN
+# START
 # ============================================================
 
-if __nif __name__ == "__main__":
+if __name__ == "__main__":
     asyncio.run(main())
