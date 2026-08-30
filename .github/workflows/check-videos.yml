@@ -21,7 +21,6 @@ jobs:
           python - <<'PY'
           import requests
           import re
-          import json
 
           VIDEO_HASHES = [
               "nybi2s7",
@@ -29,202 +28,149 @@ jobs:
               "wciz0tp"
           ]
 
-          HEADERS = {
+          headers = {
               "User-Agent": "Mozilla/5.0"
           }
 
           for video_hash in VIDEO_HASHES:
 
               print()
-              print("=" * 80)
-              print("APARAT VIDEO HASH:", video_hash)
-              print("=" * 80)
+              print("=" * 70)
+              print("VIDEO HASH:", video_hash)
+              print("=" * 70)
 
-              urls = [
-                  f"https://www.aparat.com/video/video/embed/videohash/{video_hash}/vt/frame",
-                  f"https://www.aparat.com/v/{video_hash}",
-              ]
+              url = (
+                  "https://www.aparat.com/video/video/embed/"
+                  "videohash/"
+                  + video_hash
+                  + "/vt/frame"
+              )
 
-              for url in urls:
+              print("URL:", url)
+
+              try:
+
+                  response = requests.get(
+                      url,
+                      headers=headers,
+                      timeout=30
+                  )
+
+                  print(
+                      "STATUS:",
+                      response.status_code
+                  )
+
+                  print(
+                      "FINAL URL:",
+                      response.url
+                  )
+
+                  print(
+                      "CONTENT TYPE:",
+                      response.headers.get(
+                          "content-type"
+                      )
+                  )
+
+                  html = response.text
+
+                  print(
+                      "HTML SIZE:",
+                      len(html)
+                  )
+
+                  # Search for mp4
+                  mp4_urls = re.findall(
+                      r"https?://[^\" ]+\.mp4[^\" ]*",
+                      html,
+                      re.IGNORECASE
+                  )
 
                   print()
-                  print("REQUEST:", url)
+                  print("MP4 URLS:")
 
-                  try:
+                  if mp4_urls:
 
-                      r = requests.get(
-                          url,
-                          headers=HEADERS,
-                          timeout=30,
-                          allow_redirects=True
+                      for item in set(mp4_urls):
+                          print(item)
+
+                  else:
+                      print("NO MP4 FOUND")
+
+                  # Search for m3u8
+                  m3u8_urls = re.findall(
+                      r"https?://[^\" ]+\.m3u8[^\" ]*",
+                      html,
+                      re.IGNORECASE
+                  )
+
+                  print()
+                  print("M3U8 URLS:")
+
+                  if m3u8_urls:
+
+                      for item in set(m3u8_urls):
+                          print(item)
+
+                  else:
+                      print("NO M3U8 FOUND")
+
+                  # Look around video-related words
+                  print()
+                  print("VIDEO DATA:")
+
+                  lower_html = html.lower()
+
+                  words = [
+                      "progressive",
+                      "playlist",
+                      "videoUrl",
+                      "video_url",
+                      "video",
+                      "file"
+                  ]
+
+                  for word in words:
+
+                      position = lower_html.find(
+                          word.lower()
                       )
 
-                      print(
-                          "STATUS:",
-                          r.status_code
-                      )
+                      if position >= 0:
 
-                      print(
-                          "FINAL URL:",
-                          r.url
-                      )
-
-                      print(
-                          "CONTENT TYPE:",
-                          r.headers.get(
-                              "content-type"
-                          )
-                      )
-
-                      html = r.text
-
-                      print(
-                          "HTML SIZE:",
-                          len(html)
-                      )
-
-                      found = set()
-
-                      # -----------------------------
-                      # Direct MP4
-                      # -----------------------------
-
-                      patterns = [
-                          r'https?://[^"\']+\.mp4[^"\']*',
-                          r'https?:\\/\\/[^"\\']+\.mp4[^"\\']*',
-                          r'"url"\s*:\s*"([^"]+)"',
-                          r'"file"\s*:\s*"([^"]+)"',
-                          r'"src"\s*:\s*"([^"]+)"',
-                          r'"videoUrl"\s*:\s*"([^"]+)"',
-                          r'"video_url"\s*:\s*"([^"]+)"'
-                      ]
-
-                      for pattern in patterns:
-
-                          matches = re.findall(
-                              pattern,
-                              html,
-                              flags=re.I
+                          print()
+                          print(
+                              "FOUND:",
+                              word
                           )
 
-                          for match in matches:
+                          start = max(
+                              0,
+                              position - 300
+                          )
 
-                              if isinstance(
-                                  match,
-                                  tuple
-                              ):
-                                  match = match[0]
-
-                              match = (
-                                  match
-                                  .replace(
-                                      "\\/",
-                                      "/"
-                                  )
-                                  .replace(
-                                      "\\u0026",
-                                      "&"
-                                  )
-                              )
-
-                              if (
-                                  "http" in match
-                                  or ".mp4" in match
-                              ):
-
-                                  found.add(
-                                      match
-                                  )
-
-                      # -----------------------------
-                      # JSON data
-                      # -----------------------------
-
-                      for keyword in [
-                          "progressive",
-                          "playlist",
-                          "video",
-                          "file",
-                          "source"
-                      ]:
-
-                          positions = [
-                              m.start()
-                              for m in re.finditer(
-                                  keyword,
-                                  html,
-                                  flags=re.I
-                              )
-                          ]
+                          end = min(
+                              len(html),
+                              position + 1000
+                          )
 
                           print(
-                              f"{keyword.upper()} OCCURRENCES:",
-                              len(positions)
+                              html[start:end]
                           )
 
-                          for pos in positions[:5]:
+              except Exception as error:
 
-                              start = max(
-                                  0,
-                                  pos - 300
-                              )
-
-                              end = min(
-                                  len(html),
-                                  pos + 700
-                              )
-
-                              snippet = html[
-                                  start:end
-                              ]
-
-                              if (
-                                  ".mp4" in snippet
-                                  or "http" in snippet
-                              ):
-
-                                  print(
-                                      "SNIPPET:"
-                                  )
-
-                                  print(
-                                      snippet[:1000]
-                                  )
-
-                      print()
-                      print(
-                          "POSSIBLE VIDEO URLS:"
-                      )
-
-                      if found:
-
-                          for item in sorted(found):
-
-                              print(
-                                  item[:2000]
-                              )
-
-                      else:
-
-                          print(
-                              "NO DIRECT MP4 FOUND"
-                          )
-
-                  except Exception as error:
-
-                      print(
-                          "ERROR:",
-                          repr(error)
-                      )
+                  print(
+                      "ERROR:",
+                      repr(error)
+                  )
 
           print()
-          print("=" * 80)
-          print(
-              "APARAT TEST FINISHED"
-          )
-          print(
-              "NO TELEGRAM MESSAGE SENT"
-          )
-          print("=" * 80)
+          print("=" * 70)
+          print("APARAT TEST FINISHED")
+          print("NO TELEGRAM MESSAGE SENT")
+          print("=" * 70)
 
           PY
+`
