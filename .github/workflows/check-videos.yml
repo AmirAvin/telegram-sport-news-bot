@@ -1,4 +1,4 @@
-name: Check Aparat Video
+name: Check Videos
 
 on:
   workflow_dispatch:
@@ -13,164 +13,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install requests
+      - name: Install
         run: pip install requests
 
-      - name: Test Aparat
+      - name: Test
+        env:
+          TEST_URL: https://www.aparat.com/video/video/embed/videohash/nybi2s7/vt/frame
+        run: python -c "import os,requests; r=requests.get(os.environ['TEST_URL'],headers={'User-Agent':'Mozilla/5.0'},timeout=30); print('STATUS:',r.status_code); print('FINAL:',r.url); print('TYPE:',r.headers.get('content-type')); print('SIZE:',len(r.text)); open('aparat.html','w',encoding='utf-8').write(r.text)"
+
+      - name: Search video
         run: |
-          python - <<'PY'
-          import requests
-          import re
-
-          VIDEO_HASHES = [
-              "nybi2s7",
-              "afz2t8z",
-              "wciz0tp"
-          ]
-
-          headers = {
-              "User-Agent": "Mozilla/5.0"
-          }
-
-          for video_hash in VIDEO_HASHES:
-
-              print()
-              print("=" * 70)
-              print("VIDEO HASH:", video_hash)
-              print("=" * 70)
-
-              url = (
-                  "https://www.aparat.com/video/video/embed/"
-                  "videohash/"
-                  + video_hash
-                  + "/vt/frame"
-              )
-
-              print("URL:", url)
-
-              try:
-
-                  response = requests.get(
-                      url,
-                      headers=headers,
-                      timeout=30
-                  )
-
-                  print(
-                      "STATUS:",
-                      response.status_code
-                  )
-
-                  print(
-                      "FINAL URL:",
-                      response.url
-                  )
-
-                  print(
-                      "CONTENT TYPE:",
-                      response.headers.get(
-                          "content-type"
-                      )
-                  )
-
-                  html = response.text
-
-                  print(
-                      "HTML SIZE:",
-                      len(html)
-                  )
-
-                  # Search for mp4
-                  mp4_urls = re.findall(
-                      r"https?://[^\" ]+\.mp4[^\" ]*",
-                      html,
-                      re.IGNORECASE
-                  )
-
-                  print()
-                  print("MP4 URLS:")
-
-                  if mp4_urls:
-
-                      for item in set(mp4_urls):
-                          print(item)
-
-                  else:
-                      print("NO MP4 FOUND")
-
-                  # Search for m3u8
-                  m3u8_urls = re.findall(
-                      r"https?://[^\" ]+\.m3u8[^\" ]*",
-                      html,
-                      re.IGNORECASE
-                  )
-
-                  print()
-                  print("M3U8 URLS:")
-
-                  if m3u8_urls:
-
-                      for item in set(m3u8_urls):
-                          print(item)
-
-                  else:
-                      print("NO M3U8 FOUND")
-
-                  # Look around video-related words
-                  print()
-                  print("VIDEO DATA:")
-
-                  lower_html = html.lower()
-
-                  words = [
-                      "progressive",
-                      "playlist",
-                      "videoUrl",
-                      "video_url",
-                      "video",
-                      "file"
-                  ]
-
-                  for word in words:
-
-                      position = lower_html.find(
-                          word.lower()
-                      )
-
-                      if position >= 0:
-
-                          print()
-                          print(
-                              "FOUND:",
-                              word
-                          )
-
-                          start = max(
-                              0,
-                              position - 300
-                          )
-
-                          end = min(
-                              len(html),
-                              position + 1000
-                          )
-
-                          print(
-                              html[start:end]
-                          )
-
-              except Exception as error:
-
-                  print(
-                      "ERROR:",
-                      repr(error)
-                  )
-
-          print()
-          print("=" * 70)
-          print("APARAT TEST FINISHED")
-          print("NO TELEGRAM MESSAGE SENT")
-          print("=" * 70)
-
-          PY
-`
+          grep -Eoi 'https?://[^" ]+\.(mp4|m3u8)[^" ]*' aparat.html | head -20 || tr
