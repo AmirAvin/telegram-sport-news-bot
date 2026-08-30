@@ -1,4 +1,4 @@
-name: Check Videos
+name: Check Aparat Video
 
 on:
   workflow_dispatch:
@@ -13,194 +13,218 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install
-        run: pip install requests feedparser beautifulsoup4
+      - name: Install requests
+        run: pip install requests
 
-      - name: Check Khabar Varzeshi
+      - name: Test Aparat
         run: |
           python - <<'PY'
           import requests
-          import feedparser
           import re
-          from bs4 import BeautifulSoup
-          from urllib.parse import urljoin
+          import json
+
+          VIDEO_HASHES = [
+              "nybi2s7",
+              "afz2t8z",
+              "wciz0tp"
+          ]
 
           HEADERS = {
               "User-Agent": "Mozilla/5.0"
           }
 
-          rss = "https://www.khabarvarzeshi.com/rss"
-
-          print("=" * 60)
-          print("KHABAR VARZESHI VIDEO CHECK")
-          print("=" * 60)
-
-          r = requests.get(
-              rss,
-              headers=HEADERS,
-              timeout=30
-          )
-
-          print("RSS STATUS:", r.status_code)
-
-          feed = feedparser.parse(r.content)
-
-          count = 0
-
-          for entry in feed.entries:
-
-              title = BeautifulSoup(
-                  entry.get("title", ""),
-                  "html.parser"
-              ).get_text(" ", strip=True)
-
-              url = entry.get("link", "")
-
-              if "ویدیو" not in title and "ویدئ" not in title:
-                  continue
-
-              count += 1
+          for video_hash in VIDEO_HASHES:
 
               print()
-              print("-" * 60)
-              print("TITLE:", title)
-              print("ARTICLE:", url)
+              print("=" * 80)
+              print("APARAT VIDEO HASH:", video_hash)
+              print("=" * 80)
 
-              try:
-                  page = requests.get(
-                      url,
-                      headers=HEADERS,
-                      timeout=30
-                  )
+              urls = [
+                  f"https://www.aparat.com/video/video/embed/videohash/{video_hash}/vt/frame",
+                  f"https://www.aparat.com/v/{video_hash}",
+              ]
 
-                  print(
-                      "PAGE STATUS:",
-                      page.status_code
-                  )
-
-                  soup = BeautifulSoup(
-                      page.text,
-                      "html.parser"
-                  )
-
-                  found = set()
-
-                  for meta in soup.find_all("meta"):
-
-                      key = (
-                          meta.get("property")
-                          or meta.get("name")
-                          or ""
-                      ).lower()
-
-                      value = meta.get("content", "")
-
-                      if (
-                          "video" in key
-                          and value
-                      ):
-
-                          value = urljoin(
-                              url,
-                              value
-                          )
-
-                          print(
-                              "META VIDEO:",
-                              value
-                          )
-
-                          found.add(value)
-
-                  for video in soup.find_all("video"):
-
-                      src = video.get("src")
-
-                      if src:
-                          src = urljoin(url, src)
-
-                          print(
-                              "VIDEO SRC:",
-                              src
-                          )
-
-                          found.add(src)
-
-                      for source in video.find_all("source"):
-
-                          src = (
-                              source.get("src")
-                              or source.get("data-src")
-                          )
-
-                          if src:
-                              src = urljoin(url, src)
-
-                              print(
-                                  "SOURCE:",
-                                  src
-                              )
-
-                              found.add(src)
-
-                  for iframe in soup.find_all("iframe"):
-
-                      src = iframe.get("src")
-
-                      if src:
-                          src = urljoin(url, src)
-
-                          print(
-                              "IFRAME:",
-                              src
-                          )
-
-                          found.add(src)
-
-                  patterns = [
-                      r'https?://[^"\']+\.mp4[^"\']*',
-                      r'https?://[^"\']+\.m3u8[^"\']*'
-                  ]
-
-                  for pattern in patterns:
-
-                      matches = re.findall(
-                          pattern,
-                          page.text,
-                          re.I
-                      )
-
-                      for match in matches:
-
-                          print(
-                              "RAW VIDEO:",
-                              match[:1000]
-                          )
-
-                          found.add(match)
+              for url in urls:
 
                   print()
-                  print("VIDEO URL COUNT:", len(found))
+                  print("REQUEST:", url)
 
-                  if not found:
-                      print(
-                          "NO DIRECT VIDEO FOUND"
+                  try:
+
+                      r = requests.get(
+                          url,
+                          headers=HEADERS,
+                          timeout=30,
+                          allow_redirects=True
                       )
 
-              except Exception as e:
+                      print(
+                          "STATUS:",
+                          r.status_code
+                      )
 
-                  print(
-                      "ARTICLE ERROR:",
-                      repr(e)
-                  )
+                      print(
+                          "FINAL URL:",
+                          r.url
+                      )
 
-              if count >= 5:
-                  break
+                      print(
+                          "CONTENT TYPE:",
+                          r.headers.get(
+                              "content-type"
+                          )
+                      )
+
+                      html = r.text
+
+                      print(
+                          "HTML SIZE:",
+                          len(html)
+                      )
+
+                      found = set()
+
+                      # -----------------------------
+                      # Direct MP4
+                      # -----------------------------
+
+                      patterns = [
+                          r'https?://[^"\']+\.mp4[^"\']*',
+                          r'https?:\\/\\/[^"\\']+\.mp4[^"\\']*',
+                          r'"url"\s*:\s*"([^"]+)"',
+                          r'"file"\s*:\s*"([^"]+)"',
+                          r'"src"\s*:\s*"([^"]+)"',
+                          r'"videoUrl"\s*:\s*"([^"]+)"',
+                          r'"video_url"\s*:\s*"([^"]+)"'
+                      ]
+
+                      for pattern in patterns:
+
+                          matches = re.findall(
+                              pattern,
+                              html,
+                              flags=re.I
+                          )
+
+                          for match in matches:
+
+                              if isinstance(
+                                  match,
+                                  tuple
+                              ):
+                                  match = match[0]
+
+                              match = (
+                                  match
+                                  .replace(
+                                      "\\/",
+                                      "/"
+                                  )
+                                  .replace(
+                                      "\\u0026",
+                                      "&"
+                                  )
+                              )
+
+                              if (
+                                  "http" in match
+                                  or ".mp4" in match
+                              ):
+
+                                  found.add(
+                                      match
+                                  )
+
+                      # -----------------------------
+                      # JSON data
+                      # -----------------------------
+
+                      for keyword in [
+                          "progressive",
+                          "playlist",
+                          "video",
+                          "file",
+                          "source"
+                      ]:
+
+                          positions = [
+                              m.start()
+                              for m in re.finditer(
+                                  keyword,
+                                  html,
+                                  flags=re.I
+                              )
+                          ]
+
+                          print(
+                              f"{keyword.upper()} OCCURRENCES:",
+                              len(positions)
+                          )
+
+                          for pos in positions[:5]:
+
+                              start = max(
+                                  0,
+                                  pos - 300
+                              )
+
+                              end = min(
+                                  len(html),
+                                  pos + 700
+                              )
+
+                              snippet = html[
+                                  start:end
+                              ]
+
+                              if (
+                                  ".mp4" in snippet
+                                  or "http" in snippet
+                              ):
+
+                                  print(
+                                      "SNIPPET:"
+                                  )
+
+                                  print(
+                                      snippet[:1000]
+                                  )
+
+                      print()
+                      print(
+                          "POSSIBLE VIDEO URLS:"
+                      )
+
+                      if found:
+
+                          for item in sorted(found):
+
+                              print(
+                                  item[:2000]
+                              )
+
+                      else:
+
+                          print(
+                              "NO DIRECT MP4 FOUND"
+                          )
+
+                  except Exception as error:
+
+                      print(
+                          "ERROR:",
+                          repr(error)
+                      )
 
           print()
-          print("=" * 60)
-          print("CHECK FINISHED")
-          print("NO TELEGRAM MESSAGE SENT")
-          print("=" * 60)
+          print("=" * 80)
+          print(
+              "APARAT TEST FINISHED"
+          )
+          print(
+              "NO TELEGRAM MESSAGE SENT"
+          )
+          print("=" * 80)
 
-          P
+          PY
