@@ -1,64 +1,81 @@
-name: Check Aparat API
+name: Test Aparat HLS
 
 on:
   workflow_dispatch:
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
-      - name: Install
-        run: pip install requests
-
-      - name: Test Aparat
+      - name: Download Aparat HLS
         run: |
           python - <<'PY'
           import requests
-          import json
 
           video_hash = "nybi2s7"
 
-          urls = [
-              f"https://www.aparat.com/api/fa/v1/video/video/show/videohash/{video_hash}",
-              f"https://www.aparat.com/api/fa/v1/video/video/show/videohash/{video_hash}/",
-              f"https://www.aparat.com/api/fa/v1/video/video/show/{video_hash}"
-          ]
+          api = (
+              "https://www.aparat.com/api/fa/v1/video/video/show/videohash/"
+              + video_hash
+          )
 
-          headers = {
-              "User-Agent": "Mozilla/5.0",
-              "Accept": "application/json"
-          }
+          r = requests.get(
+              api,
+              headers={"User-Agent": "Mozilla/5.0"},
+              timeout=30
+          )
 
-          for url in urls:
-              print()
-              print("=" * 70)
-              print("URL:", url)
-              print("=" * 70)
+          print("API STATUS:", r.status_code)
 
-              try:
-                  r = requests.get(
-                      url,
-                      headers=headers,
-                      timeout=30
-                  )
+          data = r.json()
 
-                  print("STATUS:", r.status_code)
-                  print("TYPE:", r.headers.get("content-type"))
-                  print("SIZE:", len(r.text))
-                  print("RESPONSE:")
-                  print(r.text[:5000])
+          attrs = data["data"]["attributes"]
 
-              except Exception as e:
-                  print("ERROR:", repr(e))
+          hls = attrs.get("hls_link")
 
-          print()
-          print("=" * 70)
-          print("TEST FINISHED")
-          print("=" * 70)
+          print("VIDEO TITLE:", attrs.get("title"))
+          print("DURATION:", attrs.get("duration"))
+          print("HLS FOUND:", bool(hls))
+
+          if not hls:
+              raise SystemExit("HLS LINK NOT FOUND")
+
+          with open("hls_url.txt", "w") as f:
+              f.write(hls)
+
+          print("HLS URL SAVED")
           PY
+
+      - name: Convert HLS to MP4
+        run: |
+          HLS_URL="$(cat hls_url.txt)"
+
+          echo "Starting FFmpeg..."
+
+          ffmpeg \
+            -y \
+            -i "$HLS_URL" \
+            -c copy \
+            -movflags +faststart \
+            test-video.mp4
+
+      - name: Check MP4
+        run: |
+          ls -lh test-video.mp4
+          ffprobe \
+            -v error \
+            -show_entries format=duration,size \
+            -of default=noprint_wrappers=1 \
+            test-video.mp4
+
+          echo "================================"
+          echo "✅ APARAT HLS -> MP4 SUCCESS"
+          echo "================================"
+          echo "NO TELEGRAM MESSAGE SENT"
+`
