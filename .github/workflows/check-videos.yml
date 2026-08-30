@@ -1,81 +1,141 @@
-name: Test Aparat HLS
+name: Test Aparat Video
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  test-aparat:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install FFmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Download Aparat HLS
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install requests
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Test Aparat API and MP4
         run: |
           python - <<'PY'
           import requests
 
-          video_hash = "nybi2s7"
+          VIDEO_HASH = "mxh0449"
 
-          api = (
-              "https://www.aparat.com/api/fa/v1/video/video/show/videohash/"
-              + video_hash
+          API_URL = (
+              "https://www.aparat.com/api/fa/v1/video/video/show/"
+              f"videohash/{VIDEO_HASH}"
           )
 
+          print("=" * 70)
+          print("APARAT VIDEO TEST")
+          print("=" * 70)
+          print("VIDEO HASH:", VIDEO_HASH)
+          print("API:", API_URL)
+          print()
+
+          headers = {
+              "User-Agent": "Mozilla/5.0"
+          }
+
           r = requests.get(
-              api,
-              headers={"User-Agent": "Mozilla/5.0"},
+              API_URL,
+              headers=headers,
               timeout=30
           )
 
           print("API STATUS:", r.status_code)
+          print("CONTENT TYPE:", r.headers.get("content-type"))
+          print()
+
+          if r.status_code != 200:
+              print("❌ Aparat API failed")
+              print(r.text[:1000])
+              raise SystemExit(1)
 
           data = r.json()
 
-          attrs = data["data"]["attributes"]
+          attrs = data.get("data", {}).get("attributes", {})
 
-          hls = attrs.get("hls_link")
+          print("TITLE:")
+          print(attrs.get("title"))
+          print()
 
-          print("VIDEO TITLE:", attrs.get("title"))
-          print("DURATION:", attrs.get("duration"))
-          print("HLS FOUND:", bool(hls))
+          print("DURATION:")
+          print(attrs.get("duration"), "seconds")
+          print()
 
-          if not hls:
-              raise SystemExit("HLS LINK NOT FOUND")
+          print("CONTENT TYPE:")
+          print(attrs.get("content_type"))
+          print()
 
-          with open("hls_url.txt", "w") as f:
-              f.write(hls)
+          print("PROCESS:")
+          print(attrs.get("process"))
+          print()
 
-          print("HLS URL SAVED")
+          file_links = attrs.get("file_link_all", [])
+
+          print("MP4 PROFILES:", len(file_links))
+          print()
+
+          mp4_url = None
+
+          for item in file_links:
+              profile = item.get("profile")
+              urls = item.get("urls", [])
+
+              print("PROFILE:", profile)
+              print("URL COUNT:", len(urls))
+
+              if urls:
+                  print("MP4 FOUND: YES")
+
+                  if mp4_url is None:
+                      mp4_url = urls[0]
+
+          print()
+
+          if not mp4_url:
+              print("❌ NO MP4 URL FOUND")
+              raise SystemExit(1)
+
+          print("=" * 70)
+          print("MP4 URL FOUND")
+          print("=" * 70)
+
+          print("Testing MP4 connection...")
+
+          video = requests.get(
+              mp4_url,
+              headers=headers,
+              stream=True,
+              timeout=30
+          )
+
+          print("MP4 STATUS:", video.status_code)
+          print("MP4 CONTENT TYPE:", video.headers.get("content-type"))
+          print("MP4 CONTENT LENGTH:", video.headers.get("content-length"))
+
+          if video.status_code != 200:
+              print("❌ MP4 URL cannot be accessed")
+              raise SystemExit(1)
+
+          content_type = video.headers.get("content-type", "")
+
+          if "video" not in content_type and "octet-stream" not in content_type:
+              print("⚠️ WARNING: unexpected content type")
+
+          print()
+          print("=" * 70)
+          print("✅ APARAT VIDEO TEST SUCCESS")
+          print("✅ API WORKS")
+          print("✅ MP4 URL FOUND")
+          print("✅ MP4 URL ACCESSIBLE")
+          print("=" * 70)
           PY
-
-      - name: Convert HLS to MP4
-        run: |
-          HLS_URL="$(cat hls_url.txt)"
-
-          echo "Starting FFmpeg..."
-
-          ffmpeg \
-            -y \
-            -i "$HLS_URL" \
-            -c copy \
-            -movflags +faststart \
-            test-video.mp4
-
-      - name: Check MP4
-        run: |
-          ls -lh test-video.mp4
-          ffprobe \
-            -v error \
-            -show_entries format=duration,size \
-            -of default=noprint_wrappers=1 \
-            test-video.mp4
-
-          echo "================================"
-          echo "✅ APARAT HLS -> MP4 SUCCESS"
-          echo "================================"
-          echo "NO TELEGRAM MESSAGE SENT"
-`
