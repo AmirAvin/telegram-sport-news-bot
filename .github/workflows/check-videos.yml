@@ -1,10 +1,10 @@
-name: Test Khabar Varzeshi Video
+name: Check Videos
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-video:
+  check:
     runs-on: ubuntu-latest
 
     steps:
@@ -13,508 +13,194 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install libraries
-        run: |
-          pip install requests feedparser beautifulsoup4
+      - name: Install
+        run: pip install requests feedparser beautifulsoup4
 
-      - name: Find and inspect video news
+      - name: Check Khabar Varzeshi
         run: |
           python - <<'PY'
           import requests
           import feedparser
           import re
-          import json
           from bs4 import BeautifulSoup
           from urllib.parse import urljoin
 
           HEADERS = {
-              "User-Agent": (
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/120.0 Safari/537.36"
-              )
+              "User-Agent": "Mozilla/5.0"
           }
 
-          RSS_URL = "https://www.khabarvarzeshi.com/rss"
+          rss = "https://www.khabarvarzeshi.com/rss"
 
-          print("=" * 90)
-          print("KHABAR VARZESHI VIDEO TEST")
-          print("=" * 90)
+          print("=" * 60)
+          print("KHABAR VARZESHI VIDEO CHECK")
+          print("=" * 60)
 
-          response = requests.get(
-              RSS_URL,
+          r = requests.get(
+              rss,
               headers=HEADERS,
               timeout=30
           )
 
-          print("RSS STATUS:", response.status_code)
+          print("RSS STATUS:", r.status_code)
 
-          response.raise_for_status()
+          feed = feedparser.parse(r.content)
 
-          feed = feedparser.parse(
-              response.content
-          )
-
-          print("RSS ENTRIES:", len(feed.entries))
-
-          selected = []
-
-          # --------------------------------------------
-          # FIND VIDEO NEWS
-          # --------------------------------------------
+          count = 0
 
           for entry in feed.entries:
 
               title = BeautifulSoup(
                   entry.get("title", ""),
                   "html.parser"
-              ).get_text(
-                  " ",
-                  strip=True
-              )
+              ).get_text(" ", strip=True)
 
-              link = (
-                  entry.get("link", "")
-                  or ""
-              ).strip()
+              url = entry.get("link", "")
 
-              if not link:
+              if "ویدیو" not in title and "ویدئ" not in title:
                   continue
 
-              text = title.lower()
-
-              if (
-                  "ویدیو" in text
-                  or "ویدئ" in text
-                  or "گلزنی" in text
-                  or "گل" in text
-              ):
-                  selected.append(
-                      (title, link)
-                  )
-
-          print(
-              "VIDEO-LIKE NEWS FOUND:",
-              len(selected)
-          )
-
-          # فقط 5 خبر
-          selected = selected[:5]
-
-          if not selected:
-              print(
-                  "NO VIDEO NEWS FOUND IN RSS"
-              )
-
-          # --------------------------------------------
-          # INSPECT EACH ARTICLE
-          # --------------------------------------------
-
-          for number, (title, article_url) in enumerate(
-              selected,
-              1
-          ):
+              count += 1
 
               print()
-              print("#" * 90)
-              print(
-                  f"ARTICLE #{number}"
-              )
-              print(
-                  "TITLE:",
-                  title
-              )
-              print(
-                  "URL:",
-                  article_url
-              )
-              print("#" * 90)
+              print("-" * 60)
+              print("TITLE:", title)
+              print("ARTICLE:", url)
 
               try:
-
-                  r = requests.get(
-                      article_url,
+                  page = requests.get(
+                      url,
                       headers=HEADERS,
-                      timeout=30,
-                      allow_redirects=True
+                      timeout=30
                   )
 
                   print(
                       "PAGE STATUS:",
-                      r.status_code
+                      page.status_code
                   )
-
-                  print(
-                      "FINAL URL:",
-                      r.url
-                  )
-
-                  print(
-                      "CONTENT TYPE:",
-                      r.headers.get(
-                          "content-type"
-                      )
-                  )
-
-                  html = r.text
 
                   soup = BeautifulSoup(
-                      html,
+                      page.text,
                       "html.parser"
                   )
 
                   found = set()
 
-                  # ----------------------------------------
-                  # META TAGS
-                  # ----------------------------------------
-
-                  print()
-                  print("--- META ---")
-
-                  for tag in soup.find_all("meta"):
+                  for meta in soup.find_all("meta"):
 
                       key = (
-                          tag.get("property")
-                          or tag.get("name")
+                          meta.get("property")
+                          or meta.get("name")
                           or ""
                       ).lower()
 
-                      value = (
-                          tag.get("content")
-                          or ""
-                      ).strip()
+                      value = meta.get("content", "")
 
-                      if not value:
-                          continue
-
-                      if any(
-                          word in key
-                          for word in [
-                              "video",
-                              "player",
-                              "media",
-                              "twitter:player"
-                          ]
+                      if (
+                          "video" in key
+                          and value
                       ):
 
                           value = urljoin(
-                              article_url,
+                              url,
                               value
                           )
 
                           print(
-                              "META:",
-                              key,
-                              "=>",
+                              "META VIDEO:",
                               value
                           )
 
                           found.add(value)
 
-                  # ----------------------------------------
-                  # VIDEO TAGS
-                  # ----------------------------------------
+                  for video in soup.find_all("video"):
 
-                  print()
-                  print("--- VIDEO TAGS ---")
+                      src = video.get("src")
 
-                  videos = soup.find_all("video")
+                      if src:
+                          src = urljoin(url, src)
 
-                  print(
-                      "VIDEO TAG COUNT:",
-                      len(videos)
-                  )
+                          print(
+                              "VIDEO SRC:",
+                              src
+                          )
 
-                  for video in videos:
-
-                      for attr in [
-                          "src",
-                          "data-src",
-                          "data-video",
-                          "data-url",
-                          "data-file",
-                          "data-video-url"
-                      ]:
-
-                          value = video.get(attr)
-
-                          if value:
-
-                              value = urljoin(
-                                  article_url,
-                                  value
-                              )
-
-                              print(
-                                  "VIDEO:",
-                                  attr,
-                                  "=>",
-                                  value
-                              )
-
-                              found.add(value)
+                          found.add(src)
 
                       for source in video.find_all("source"):
 
-                          for attr in [
-                              "src",
-                              "data-src",
-                              "data-file"
-                          ]:
+                          src = (
+                              source.get("src")
+                              or source.get("data-src")
+                          )
 
-                              value = source.get(attr)
-
-                              if value:
-
-                                  value = urljoin(
-                                      article_url,
-                                      value
-                                  )
-
-                                  print(
-                                      "SOURCE:",
-                                      attr,
-                                      "=>",
-                                      value
-                                  )
-
-                                  found.add(value)
-
-                  # ----------------------------------------
-                  # SOURCE TAGS
-                  # ----------------------------------------
-
-                  print()
-                  print("--- SOURCE TAGS ---")
-
-                  for source in soup.find_all("source"):
-
-                      for attr in [
-                          "src",
-                          "data-src",
-                          "data-file"
-                      ]:
-
-                          value = source.get(attr)
-
-                          if value:
-
-                              value = urljoin(
-                                  article_url,
-                                  value
-                              )
+                          if src:
+                              src = urljoin(url, src)
 
                               print(
                                   "SOURCE:",
-                                  attr,
-                                  "=>",
-                                  value
+                                  src
                               )
 
-                              found.add(value)
-
-                  # ----------------------------------------
-                  # IFRAMES
-                  # ----------------------------------------
-
-                  print()
-                  print("--- IFRAMES ---")
+                              found.add(src)
 
                   for iframe in soup.find_all("iframe"):
 
-                      for attr in [
-                          "src",
-                          "data-src"
-                      ]:
+                      src = iframe.get("src")
 
-                          value = iframe.get(attr)
+                      if src:
+                          src = urljoin(url, src)
 
-                          if value:
+                          print(
+                              "IFRAME:",
+                              src
+                          )
 
-                              value = urljoin(
-                                  article_url,
-                                  value
-                              )
-
-                              print(
-                                  "IFRAME:",
-                                  value
-                              )
-
-                              found.add(value)
-
-                  # ----------------------------------------
-                  # ELEMENTS WITH VIDEO ATTRIBUTES
-                  # ----------------------------------------
-
-                  print()
-                  print("--- VIDEO ATTRIBUTES ---")
-
-                  for tag in soup.find_all(True):
-
-                      for attr, value in tag.attrs.items():
-
-                          attr_name = attr.lower()
-
-                          if (
-                              "video" in attr_name
-                              or "media" in attr_name
-                              or attr_name in [
-                                  "data-src",
-                                  "data-url",
-                                  "data-file"
-                              ]
-                          ):
-
-                              if isinstance(
-                                  value,
-                                  list
-                              ):
-
-                                  value = " ".join(
-                                      value
-                                  )
-
-                              if not isinstance(
-                                  value,
-                                  str
-                              ):
-
-                                  continue
-
-                              value = value.strip()
-
-                              if not value:
-                                  continue
-
-                              if (
-                                  "http" in value
-                                  or ".mp4" in value.lower()
-                                  or ".m3u8" in value.lower()
-                              ):
-
-                                  value = urljoin(
-                                      article_url,
-                                      value
-                                  )
-
-                                  print(
-                                      "ATTRIBUTE:",
-                                      attr_name,
-                                      "=>",
-                                      value
-                                  )
-
-                                  found.add(value)
-
-                  # ----------------------------------------
-                  # RAW MP4 / M3U8
-                  # ----------------------------------------
-
-                  print()
-                  print("--- RAW VIDEO URLS ---")
+                          found.add(src)
 
                   patterns = [
-                      r'https?://[^"\'>\s]+\.mp4(?:\?[^"\'>\s]*)?',
-                      r'https?://[^"\'>\s]+\.m3u8(?:\?[^"\'>\s]*)?',
-                      r'https?://[^"\'>\s]+\.webm(?:\?[^"\'>\s]*)?',
-                      r'https?://[^"\'>\s]+\.mov(?:\?[^"\'>\s]*)?'
+                      r'https?://[^"\']+\.mp4[^"\']*',
+                      r'https?://[^"\']+\.m3u8[^"\']*'
                   ]
 
                   for pattern in patterns:
 
                       matches = re.findall(
                           pattern,
-                          html,
-                          flags=re.I
+                          page.text,
+                          re.I
                       )
 
-                      for match in sorted(
-                          set(matches)
-                      ):
+                      for match in matches:
 
                           print(
-                              "RAW:",
+                              "RAW VIDEO:",
                               match[:1000]
                           )
 
                           found.add(match)
 
-                  # ----------------------------------------
-                  # JSON-LD
-                  # ----------------------------------------
-
                   print()
-                  print("--- JSON-LD ---")
+                  print("VIDEO URL COUNT:", len(found))
 
-                  for script in soup.find_all(
-                      "script",
-                      type="application/ld+json"
-                  ):
-
-                      raw = script.string
-
-                      if not raw:
-                          continue
-
-                      try:
-
-                          data = json.loads(
-                              raw
-                          )
-
-                          print(
-                              json.dumps(
-                                  data,
-                                  ensure_ascii=False,
-                                  indent=2
-                              )[:10000]
-                          )
-
-                      except Exception:
-
-                          print(
-                              "JSON-LD could not be parsed"
-                          )
-
-                  # ----------------------------------------
-                  # FINAL RESULT
-                  # ----------------------------------------
-
-                  print()
-                  print("--- POSSIBLE VIDEO URLS ---")
-
-                  if found:
-
-                      for url in sorted(found):
-
-                          print(
-                              url[:1500]
-                          )
-
-                  else:
-
+                  if not found:
                       print(
-                          "NO VIDEO URL FOUND"
+                          "NO DIRECT VIDEO FOUND"
                       )
 
-              except Exception as error:
+              except Exception as e:
 
                   print(
                       "ARTICLE ERROR:",
-                      repr(error)
+                      repr(e)
                   )
 
-          print()
-          print("=" * 90)
-          print(
-              "TEST FINISHED"
-          )
-          print(
-              "NO TELEGRAM MESSAGE WAS SENT"
-          )
-          print("=" * 90)
+              if count >= 5:
+                  break
 
-          PY
-``
+          print()
+          print("=" * 60)
+          print("CHECK FINISHED")
+          print("NO TELEGRAM MESSAGE SENT")
+          print("=" * 60)
+
+          P
