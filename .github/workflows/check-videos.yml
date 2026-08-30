@@ -1,4 +1,4 @@
-name: Check Videos
+name: Check Aparat API
 
 on:
   workflow_dispatch:
@@ -16,11 +16,49 @@ jobs:
       - name: Install
         run: pip install requests
 
-      - name: Test
-        env:
-          TEST_URL: https://www.aparat.com/video/video/embed/videohash/nybi2s7/vt/frame
-        run: python -c "import os,requests; r=requests.get(os.environ['TEST_URL'],headers={'User-Agent':'Mozilla/5.0'},timeout=30); print('STATUS:',r.status_code); print('FINAL:',r.url); print('TYPE:',r.headers.get('content-type')); print('SIZE:',len(r.text)); open('aparat.html','w',encoding='utf-8').write(r.text)"
-
-      - name: Search video
+      - name: Test Aparat
         run: |
-          grep -Eoi 'https?://[^" ]+\.(mp4|m3u8)[^" ]*' aparat.html | head -20 || tr
+          python - <<'PY'
+          import requests
+          import json
+
+          video_hash = "nybi2s7"
+
+          urls = [
+              f"https://www.aparat.com/api/fa/v1/video/video/show/videohash/{video_hash}",
+              f"https://www.aparat.com/api/fa/v1/video/video/show/videohash/{video_hash}/",
+              f"https://www.aparat.com/api/fa/v1/video/video/show/{video_hash}"
+          ]
+
+          headers = {
+              "User-Agent": "Mozilla/5.0",
+              "Accept": "application/json"
+          }
+
+          for url in urls:
+              print()
+              print("=" * 70)
+              print("URL:", url)
+              print("=" * 70)
+
+              try:
+                  r = requests.get(
+                      url,
+                      headers=headers,
+                      timeout=30
+                  )
+
+                  print("STATUS:", r.status_code)
+                  print("TYPE:", r.headers.get("content-type"))
+                  print("SIZE:", len(r.text))
+                  print("RESPONSE:")
+                  print(r.text[:5000])
+
+              except Exception as e:
+                  print("ERROR:", repr(e))
+
+          print()
+          print("=" * 70)
+          print("TEST FINISHED")
+          print("=" * 70)
+          PY
