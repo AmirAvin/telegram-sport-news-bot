@@ -1,7 +1,8 @@
-name: Football Bot Runner
+name: Main Yamal
 
 on:
   workflow_dispatch:
+
   schedule:
     - cron: "*/15 * * * *"
 
@@ -17,35 +18,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # ============================================
+      # CHECKOUT
+      # ============================================
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ============================================
+      # PYTHON
+      # ============================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      # ============================================
+      # INSTALL REQUIREMENTS
+      # ============================================
       - name: Install requirements
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Test API-Football
-        env:
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-        run: python test_api_football.py
-
+      # ============================================
+      # RUN BOT
+      # ============================================
       - name: Run bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHANNEL: ${{ secrets.CHANNEL }}
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-        run: python bot.py
 
+          # API-FOOTBALL
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+
+        run: |
+          python bot.py
+
+      # ============================================
+      # SAVE SENT NEWS
+      # ============================================
       - name: Save sent news
         run: |
           git config user.name "github-actions"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add sent_news.json
+
           git diff --cached --quiet || git commit -m "Update sent news"
+
           git push
