@@ -5,6 +5,7 @@ import html
 import time
 import requests
 import feedparser
+import asyncio
 
 from bs4 import BeautifulSoup
 from telegram import Bot
@@ -30,61 +31,49 @@ CUSTOM_EMOJI_ID = "5231262796364137694"
 
 RSS_SOURCES = [
 
-    # =========================
-    # 🇮🇷 KHABAR VARZESHI - IRAN
-    # =========================
+    # 🇮🇷 ایران
 
     # لیگ برتر ایران
     "https://www.khabarvarzeshi.com/rss/tp/63",
 
-    # لیگ انگلیس
+    # لیگ یک ایران
+    "https://www.khabarvarzeshi.com/rss/tp/110",
+
+    # بازیکنان ایرانی خارج از کشور
+    "https://www.khabarvarzeshi.com/rss/tp/111",
+
+    # جام حذفی ایران
+    "https://www.khabarvarzeshi.com/rss/tp/103",
+
+    # 🌍 اروپا
+
+    # انگلیس
     "https://www.khabarvarzeshi.com/rss/tp/64",
 
-    # لالیگا
+    # اسپانیا
     "https://www.khabarvarzeshi.com/rss/tp/65",
 
-    # بوندسلیگا
+    # آلمان
     "https://www.khabarvarzeshi.com/rss/tp/66",
 
-    # سری آ
+    # ایتالیا
     "https://www.khabarvarzeshi.com/rss/tp/67",
 
-    # لیگ فرانسه
+    # فرانسه
     "https://www.khabarvarzeshi.com/rss/tp/68",
 
-    # لیگ قهرمانان اروپا
+    # لیگ قهرمانان
     "https://www.khabarvarzeshi.com/rss/tp/75",
 
     # لیگ اروپا
     "https://www.khabarvarzeshi.com/rss/tp/76",
 
-    # بازیکنان ایرانی خارج از کشور
-    "https://www.khabarvarzeshi.com/rss/tp/111",
-
-    # لیگ یک ایران
-    "https://www.khabarvarzeshi.com/rss/tp/110",
-
-    # جام حذفی ایران
-    "https://www.khabarvarzeshi.com/rss/tp/103",
-
-    # =========================
-    # 🇮🇷 SARPOOSH - IRAN FOOTBALL
-    # =========================
-
+    # Sarpoosh
     "https://www.sarpoosh.com/rss/football.xml",
-
     "https://www.sarpoosh.com/rss/iran-pro-league.xml",
-
-    "https://www.sarpoosh.com/rss/football-transfers/iran.xml",
-
-    # =========================
-    # 🌍 WORLD FOOTBALL
-    # =========================
-
     "https://www.sarpoosh.com/rss/football-world.xml",
-
     "https://www.sarpoosh.com/rss/champions-league.xml",
-
+    "https://www.sarpoosh.com/rss/football-transfers/iran.xml",
     "https://www.sarpoosh.com/rss/football-transfers/world.xml",
 ]
 
@@ -96,6 +85,7 @@ RSS_SOURCES = [
 FOOTBALL_KEYWORDS = [
 
     # 🇮🇷 ایران
+
     "استقلال",
     "پرسپولیس",
     "سپاهان",
@@ -113,70 +103,54 @@ FOOTBALL_KEYWORDS = [
     "خیبر",
     "چادرملو",
     "استقلال خوزستان",
-    "پیکان",
     "مس رفسنجان",
     "مس کرمان",
+    "پیکان",
     "فجر سپاسی",
-    "شهر خودرو",
 
     # تیم ملی
     "تیم ملی",
     "تیم‌ملی",
-    "ایران",
+    "فوتبال ایران",
+    "بازیکن ایرانی",
     "ملی پوش",
     "ملی‌پوش",
     "امیر قلعه نویی",
     "قلعه نویی",
     "قلعه‌نویی",
 
-    # مسابقات ایران
+    # مسابقات داخلی
     "لیگ برتر",
     "لیگ برتر ایران",
-    "جام حذفی",
     "لیگ یک",
+    "جام حذفی",
     "آزادگان",
-    "فوتبال ایران",
-    "فوتبال کشور",
 
     # نقل و انتقالات
     "نقل و انتقالات",
     "نقل‌وانتقالات",
     "انتقالات",
-    "خرید",
-    "فروش",
     "قرارداد",
     "تمدید قرارداد",
 
-    # بازیکنان
-    "بازیکن",
-    "مربی",
-    "سرمربی",
-    "دروازه بان",
-    "دروازه‌بان",
-    "مهاجم",
-    "مدافع",
-    "هافبک",
-
-    # مسابقه
+    # مسابقات
+    "فوتبال",
     "گل",
     "گلزنی",
     "گلزن",
-    "بازی",
-    "دیدار",
-    "مسابقه",
     "دربی",
     "داربی",
-    "نتیجه",
     "ترکیب",
     "داور",
-    "کارت قرمز",
     "کارت زرد",
+    "کارت قرمز",
     "اخراج",
-    "VAR",
-    "وی ای آر",
     "تعویض",
+    "var",
+    "وی ای آر",
 
     # 🌍 اروپا
+
     "رئال مادرید",
     "بارسلونا",
     "اتلتیکو مادرید",
@@ -195,17 +169,17 @@ FOOTBALL_KEYWORDS = [
     "پاری سن ژرمن",
     "پاری‌سن‌ژرمن",
 
-    # لیگ‌ها
+    # لیگ‌های اروپایی
     "لیگ قهرمانان اروپا",
     "لیگ اروپا",
-    "پریمیرلیگ",
     "لیگ انگلیس",
+    "پریمیرلیگ",
     "لالیگا",
     "سری آ",
     "بوندسلیگا",
     "لیگ فرانسه",
 
-    # بازیکنان معروف
+    # ستاره‌ها
     "رونالدو",
     "مسی",
     "امباپه",
@@ -222,7 +196,6 @@ FOOTBALL_KEYWORDS = [
 # =========================================================
 
 NON_FOOTBALL_KEYWORDS = [
-
     "والیبال",
     "بسکتبال",
     "کشتی",
@@ -239,7 +212,7 @@ NON_FOOTBALL_KEYWORDS = [
 
 
 # =========================================================
-# NORMALIZE TEXT
+# NORMALIZE TITLE
 # =========================================================
 
 def normalize_title(text):
@@ -249,7 +222,10 @@ def normalize_title(text):
 
     text = html.unescape(str(text))
 
-    text = BeautifulSoup(text, "html.parser").get_text(" ")
+    text = BeautifulSoup(
+        text,
+        "html.parser"
+    ).get_text(" ")
 
     text = text.replace("‌", " ")
 
@@ -298,7 +274,10 @@ def load_sent_news():
 
     except Exception as e:
 
-        print("SENT FILE ERROR:", e)
+        print(
+            "SENT FILE ERROR:",
+            e
+        )
 
     return []
 
@@ -322,18 +301,30 @@ def save_sent_news(sent_news):
 
     except Exception as e:
 
-        print("SAVE SENT ERROR:", e)
+        print(
+            "SAVE SENT ERROR:",
+            e
+        )
 
 
 # =========================================================
 # DUPLICATE CHECK
 # =========================================================
 
-def is_duplicate_news(title, link, sent_news):
+def is_duplicate_news(
+    title,
+    link,
+    sent_news
+):
 
-    normalized = normalize_title(title)
+    normalized = normalize_title(
+        title
+    )
 
-    title_key = "title:" + normalized
+    title_key = (
+        "title:" +
+        normalized
+    )
 
     for item in sent_news:
 
@@ -345,14 +336,25 @@ def is_duplicate_news(title, link, sent_news):
 
         if isinstance(item, dict):
 
-            old_link = item.get("link", "")
-            old_title = item.get("title", "")
+            old_link = item.get(
+                "link",
+                ""
+            )
 
-            if old_link and old_link == link:
+            old_title = item.get(
+                "title",
+                ""
+            )
+
+            if old_link == link:
                 return True
 
             if old_title:
-                if normalize_title(old_title) == normalized:
+
+                if normalize_title(
+                    old_title
+                ) == normalized:
+
                     return True
 
     return False
@@ -364,45 +366,68 @@ def register_sent_news(
     link
 ):
 
-    normalized = normalize_title(title)
+    normalized = normalize_title(
+        title
+    )
 
     if link and link not in sent_news:
+
         sent_news.append(link)
 
-    title_key = "title:" + normalized
+    title_key = (
+        "title:" +
+        normalized
+    )
 
     if title_key not in sent_news:
+
         sent_news.append(title_key)
 
-    save_sent_news(sent_news)
+    save_sent_news(
+        sent_news
+    )
 
 
 # =========================================================
 # FOOTBALL FILTER
 # =========================================================
 
-def is_football_news(title, summary=""):
+def is_football_news(
+    title,
+    summary=""
+):
 
     text = normalize_title(
         f"{title} {summary}"
     )
 
-    # اگر صراحتاً مربوط به ورزش دیگری بود
+    # -----------------------------------------
+    # خبرهای غیر فوتبالی
+    # -----------------------------------------
+
     for bad in NON_FOOTBALL_KEYWORDS:
 
-        if normalize_title(bad) in text:
+        bad_normalized = normalize_title(
+            bad
+        )
 
-            # اگر همزمان کلمه فوتبال ایران/فوتبال داشت
+        if bad_normalized in text:
+
             if (
                 "فوتبال" not in text
                 and "استقلال" not in text
                 and "پرسپولیس" not in text
                 and "تیم ملی" not in text
             ):
+
                 return False
 
-    # خبرهای فوتبال ایران
+    # -----------------------------------------
+    # ایران
+    # -----------------------------------------
+
     iran_words = [
+
         "استقلال",
         "پرسپولیس",
         "سپاهان",
@@ -430,16 +455,25 @@ def is_football_news(title, summary=""):
     for word in iran_words:
 
         if normalize_title(word) in text:
+
             return True
 
-    # خبرهای فوتبال اروپا
+    # -----------------------------------------
+    # فوتبال اروپا
+    # -----------------------------------------
+
     for word in FOOTBALL_KEYWORDS:
 
         if normalize_title(word) in text:
+
             return True
 
-    # خود کلمه فوتبال
+    # -----------------------------------------
+    # فوتبال عمومی
+    # -----------------------------------------
+
     if "فوتبال" in text:
+
         return True
 
     return False
@@ -458,7 +492,10 @@ def get_news():
 
     for rss_url in RSS_SOURCES:
 
-        print("\nRSS:", rss_url)
+        print(
+            "\nRSS:",
+            rss_url
+        )
 
         try:
 
@@ -477,6 +514,7 @@ def get_news():
             )
 
             if response.status_code != 200:
+
                 continue
 
             feed = feedparser.parse(
@@ -486,22 +524,31 @@ def get_news():
             for entry in feed.entries[:20]:
 
                 title = (
-                    entry.get("title")
+                    entry.get(
+                        "title"
+                    )
                     or ""
                 ).strip()
 
                 link = (
-                    entry.get("link")
+                    entry.get(
+                        "link"
+                    )
                     or ""
                 ).strip()
 
                 summary = (
-                    entry.get("summary")
-                    or entry.get("description")
+                    entry.get(
+                        "summary"
+                    )
+                    or entry.get(
+                        "description"
+                    )
                     or ""
                 )
 
                 if not title or not link:
+
                     continue
 
                 normalized = normalize_title(
@@ -510,9 +557,11 @@ def get_news():
 
                 # تکراری داخل همین اجرا
                 if link in seen_urls:
+
                     continue
 
                 if normalized in seen_titles:
+
                     continue
 
                 # فقط فوتبال
@@ -520,21 +569,31 @@ def get_news():
                     title,
                     summary
                 ):
+
                     print(
                         "NOT FOOTBALL:",
                         title[:100]
                     )
+
                     continue
 
                 seen_urls.add(link)
-                seen_titles.add(normalized)
+                seen_titles.add(
+                    normalized
+                )
 
                 all_news.append({
+
                     "title": title,
+
                     "link": link,
+
                     "summary": summary,
+
                     "source": rss_url,
+
                     "entry": entry,
+
                 })
 
         except Exception as e:
@@ -554,7 +613,7 @@ def get_news():
 
 
 # =========================================================
-# ARTICLE CONTENT
+# ARTICLE
 # =========================================================
 
 def get_article_content(url):
@@ -583,6 +642,7 @@ def get_article_content(url):
         )
 
         if response.status_code != 200:
+
             return ""
 
         soup = BeautifulSoup(
@@ -597,14 +657,13 @@ def get_article_content(url):
                 "noscript"
             ]
         ):
+
             tag.decompose()
 
-        text = soup.get_text(
+        return soup.get_text(
             " ",
             strip=True
         )
-
-        return text
 
     except Exception as e:
 
@@ -634,6 +693,7 @@ def get_aparat_video(url):
         )
 
         if response.status_code != 200:
+
             return None
 
         soup = BeautifulSoup(
@@ -649,6 +709,7 @@ def get_aparat_video(url):
         )
 
         if not iframe:
+
             return None
 
         iframe_url = iframe.get(
@@ -667,9 +728,12 @@ def get_aparat_video(url):
         )
 
         if not match:
+
             return None
 
-        video_hash = match.group(1)
+        video_hash = match.group(
+            1
+        )
 
         print(
             "APARAT VIDEO HASH FOUND:",
@@ -697,25 +761,27 @@ def get_aparat_video(url):
         )
 
         if api_response.status_code != 200:
+
             return None
 
         data = api_response.json()
 
-        # جستجوی لینک mp4
         def find_mp4(obj):
 
-            if isinstance(obj, dict):
+            if isinstance(
+                obj,
+                dict
+            ):
 
-                for key, value in obj.items():
+                for value in obj.values():
 
                     if isinstance(
                         value,
                         str
                     ):
 
-                        if (
-                            ".mp4" in value
-                        ):
+                        if ".mp4" in value:
+
                             return value
 
                     result = find_mp4(
@@ -723,6 +789,7 @@ def get_aparat_video(url):
                     )
 
                     if result:
+
                         return result
 
             elif isinstance(
@@ -737,11 +804,14 @@ def get_aparat_video(url):
                     )
 
                     if result:
+
                         return result
 
             return None
 
-        mp4 = find_mp4(data)
+        mp4 = find_mp4(
+            data
+        )
 
         if mp4:
 
@@ -762,7 +832,7 @@ def get_aparat_video(url):
 
 
 # =========================================================
-# IMAGE FROM RSS
+# RSS IMAGE
 # =========================================================
 
 def get_entry_image(entry):
@@ -782,6 +852,7 @@ def get_entry_image(entry):
                 )
 
                 if url:
+
                     return url
 
         media_thumbnail = entry.get(
@@ -797,6 +868,7 @@ def get_entry_image(entry):
                 )
 
                 if url:
+
                     return url
 
         enclosures = entry.get(
@@ -807,13 +879,17 @@ def get_entry_image(entry):
 
             for enclosure in enclosures:
 
-                url = enclosure.get(
-                    "href"
-                ) or enclosure.get(
-                    "url"
+                url = (
+                    enclosure.get(
+                        "href"
+                    )
+                    or enclosure.get(
+                        "url"
+                    )
                 )
 
                 if url:
+
                     return url
 
     except Exception as e:
@@ -837,7 +913,6 @@ def send_news(
 
     title = news["title"]
     link = news["link"]
-
     entry = news["entry"]
 
     print(
@@ -845,9 +920,9 @@ def send_news(
         title
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # APARAT VIDEO
-    # -----------------------------------------------------
+    # =====================================================
 
     video_url = None
 
@@ -892,7 +967,8 @@ def send_news(
 
             if (
                 media_response.status_code == 200
-                and "video" in
+                and
+                "video" in
                 media_response.headers.get(
                     "content-type",
                     ""
@@ -913,34 +989,46 @@ def send_news(
                     ):
 
                         if chunk:
-                            f.write(chunk)
+
+                            f.write(
+                                chunk
+                            )
 
                 print(
                     "✅ VIDEO DOWNLOADED"
                 )
 
+                # بدون لینک خبر
                 caption = (
-                    f"⚽️ <b>{html.escape(title)}</b>\n\n"
-                    f"🔗 {html.escape(link)}\n\n"
+                    f"⚽️ <b>"
+                    f"{html.escape(title)}"
+                    f"</b>\n\n"
                     f"@ligebartar24"
                 )
 
-                with open(
-                    temp_file,
-                    "rb"
-                ) as video_file:
+                asyncio.get_event_loop().run_until_complete(
 
-                    await_send_video(
-                        bot,
-                        video_file,
-                        caption
+                    bot.send_video(
+                        chat_id=CHANNEL,
+                        video=open(
+                            temp_file,
+                            "rb"
+                        ),
+                        caption=caption,
+                        parse_mode=ParseMode.HTML,
+                        supports_streaming=True
                     )
 
+                )
+
                 try:
+
                     os.remove(
                         temp_file
                     )
+
                 except:
+
                     pass
 
                 print(
@@ -957,17 +1045,19 @@ def send_news(
                 e
             )
 
-    # -----------------------------------------------------
+    # =====================================================
     # IMAGE
-    # -----------------------------------------------------
+    # =====================================================
 
     image_url = get_entry_image(
         entry
     )
 
+    # بدون لینک خبر
     caption = (
-        f"⚽️ <b>{html.escape(title)}</b>\n\n"
-        f"🔗 {html.escape(link)}\n\n"
+        f"⚽️ <b>"
+        f"{html.escape(title)}"
+        f"</b>\n\n"
         f"@ligebartar24"
     )
 
@@ -975,10 +1065,15 @@ def send_news(
 
         if image_url:
 
-            await_send_photo(
-                bot,
-                image_url,
-                caption
+            asyncio.get_event_loop().run_until_complete(
+
+                bot.send_photo(
+                    chat_id=CHANNEL,
+                    photo=image_url,
+                    caption=caption,
+                    parse_mode=ParseMode.HTML
+                )
+
             )
 
             print(
@@ -987,9 +1082,15 @@ def send_news(
 
         else:
 
-            await_send_message(
-                bot,
-                caption
+            asyncio.get_event_loop().run_until_complete(
+
+                bot.send_message(
+                    chat_id=CHANNEL,
+                    text=caption,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=False
+                )
+
             )
 
             print(
@@ -1014,62 +1115,7 @@ def send_news(
 
 
 # =========================================================
-# ASYNC HELPERS
-# =========================================================
-
-import asyncio
-
-
-def await_send_message(
-    bot,
-    text
-):
-
-    asyncio.get_event_loop().run_until_complete(
-        bot.send_message(
-            chat_id=CHANNEL,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=False
-        )
-    )
-
-
-def await_send_photo(
-    bot,
-    photo,
-    caption
-):
-
-    asyncio.get_event_loop().run_until_complete(
-        bot.send_photo(
-            chat_id=CHANNEL,
-            photo=photo,
-            caption=caption,
-            parse_mode=ParseMode.HTML
-        )
-    )
-
-
-def await_send_video(
-    bot,
-    video,
-    caption
-):
-
-    asyncio.get_event_loop().run_until_complete(
-        bot.send_video(
-            chat_id=CHANNEL,
-            video=video,
-            caption=caption,
-            parse_mode=ParseMode.HTML,
-            supports_streaming=True
-        )
-    )
-
-
-# =========================================================
-# PROCESS RSS
+# PROCESS RSS NEWS
 # =========================================================
 
 def process_rss_news():
@@ -1084,6 +1130,10 @@ def process_rss_news():
     news_list = get_news()
 
     sent_count = 0
+
+    bot = Bot(
+        token=BOT_TOKEN
+    )
 
     for news in news_list:
 
@@ -1112,10 +1162,6 @@ def process_rss_news():
             title
         )
 
-        bot = Bot(
-            token=BOT_TOKEN
-        )
-
         try:
 
             success = send_news(
@@ -1137,7 +1183,6 @@ def process_rss_news():
                     "✅ SAVED TO DATABASE"
                 )
 
-                # جلوگیری از ارسال سریع تعداد زیاد
                 time.sleep(2)
 
         except Exception as e:
@@ -1280,10 +1325,7 @@ def main():
             "➡️ RSS NEWS WILL STILL RUN"
         )
 
-    # ---------------------------------------------
     # RSS
-    # ---------------------------------------------
-
     sent = process_rss_news()
 
     print(
