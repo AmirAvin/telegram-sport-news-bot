@@ -1,572 +1,268 @@
 import os
-import json
 import re
-import asyncio
-import feedparser
+import json
+import html
+import time
 import requests
+import feedparser
 
-from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from telegram import Bot
+from telegram.constants import ParseMode
 
 
-# ============================================================
+# =========================================================
 # SETTINGS
-# ============================================================
+# =========================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL = os.getenv("CHANNEL")
+CHANNEL = os.getenv("CHANNEL", "@ligebartar24")
 API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY")
 
 SENT_FILE = "sent_news.json"
 
-MAX_NEWS_PER_RUN = 10
-REQUEST_TIMEOUT = 25
-
 CUSTOM_EMOJI_ID = "5231262796364137694"
 
-API_BASE = "https://v3.football.api-sports.io"
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36"
-    )
-}
-
-
-# ============================================================
-# FOOTBALL KEYWORDS
-# ============================================================
-
-FOOTBALL_KEYWORDS = [
-    "فوتبال", "football", "soccer",
-    "استقلال", "پرسپولیس", "سپاهان", "تراکتور",
-    "ذوب آهن", "ذوب‌آهن", "گل گهر", "گل‌گهر",
-    "نساجی", "ملوان", "فولاد", "هوادار",
-    "آلومینیوم", "شمس آذر", "خیبر", "چادرملو",
-    "مس رفسنجان", "پیکان", "فجر سپاسی", "فجرسپاسی",
-    "تیم ملی", "تیم‌ملی",
-    "لیگ برتر", "جام حذفی", "جام جهانی",
-    "لیگ قهرمانان", "لیگ اروپا", "کنفرانس لیگ",
-    "لیگ نخبگان", "لیگ قهرمانان آسیا",
-    "لیگ نخبگان آسیا", "آزادگان", "سوپر جام",
-    "لژیونر", "طارمی", "آزمون", "جهانبخش",
-    "قایدی", "علیپور", "قدوس",
-    "رونالدو", "مسی", "نیمار", "امباپه",
-    "لامین یامال", "یامال", "هالند",
-    "رئال مادرید", "بارسلونا",
-    "منچستریونایتد", "منچسترسیتی",
-    "لیورپول", "چلسی", "آرسنال", "تاتنهام",
-    "بایرن مونیخ", "اینتر", "میلان",
-    "یوونتوس", "ناپولی", "رم", "لاتزیو",
-    "پاری سن ژرمن", "پاری‌سن ژرمن",
-    "مارسی", "اتلتیکو مادرید", "سویا", "والنسیا",
-    "دربی", "داربی", "گلزنی", "پنالتی",
-    "کارت قرمز", "کارت زرد", "ترکیب",
-    "مصدومیت", "انتقال", "نقل و انتقالات",
-    "سرمربی", "بازیکن", "دروازه بان",
-    "دروازه‌بان", "مهاجم", "مدافع", "هافبک",
-    "تعویض", "VAR", "وی‌ای‌آر",
-]
-
-
-# ============================================================
-# NON FOOTBALL KEYWORDS
-# ============================================================
-
-NON_FOOTBALL_KEYWORDS = [
-    "نفتکش", "کشاورزی", "آبرسانی", "روستا",
-    "وزیر نیرو", "وزارت نیرو", "اوتیسم",
-    "جهاد کشاورزی", "کرملین", "سفیر",
-    "جنگ", "تنگه هرمز", "سیاست", "سیاسی",
-    "اقتصاد", "اقتصادی", "بورس", "دلار", "طلا",
-    "مسکن", "زلزله", "هواشناسی", "بارندگی",
-    "آلودگی هوا", "انتخابات", "مجلس", "دولت",
-    "رئیس جمهور", "رئیس‌جمهور", "وزیر",
-    "استاندار", "شهردار", "شهرداری",
-    "دادگاه", "دادگستری", "قیمت خودرو",
-    "خودرو", "تصادف", "حوادث", "هنر",
-    "سینما", "تلویزیون", "بازیگر", "خواننده",
-    "موسیقی",
-]
-
-
-# ============================================================
-# HASHTAGS
-# ============================================================
-
-HASHTAG_KEYWORDS = [
-    "استقلال", "پرسپولیس", "سپاهان", "تراکتور",
-    "ذوب آهن", "ذوب‌آهن", "گل گهر", "گل‌گهر",
-    "نساجی", "ملوان", "فولاد", "تیم ملی",
-    "لیگ برتر", "جام حذفی", "جام جهانی",
-    "لیگ قهرمانان", "لیگ اروپا", "لژیونر",
-    "طارمی", "آزمون", "جهانبخش", "قایدی",
-    "رئال مادرید", "بارسلونا",
-    "منچستریونایتد", "منچسترسیتی",
-    "لیورپول", "چلسی", "آرسنال",
-    "بایرن مونیخ", "اینتر", "میلان",
-    "یوونتوس", "پاری سن ژرمن",
-    "پاری‌سن ژرمن", "فوتبال ایران",
-    "فوتبال اروپا",
-]
-
-
-# ============================================================
+# =========================================================
 # RSS SOURCES
-# ============================================================
+# =========================================================
 
 RSS_SOURCES = [
+
+    # =========================
+    # 🇮🇷 KHABAR VARZESHI - IRAN
+    # =========================
+
+    # لیگ برتر ایران
     "https://www.khabarvarzeshi.com/rss/tp/63",
+
+    # لیگ انگلیس
     "https://www.khabarvarzeshi.com/rss/tp/64",
+
+    # لالیگا
     "https://www.khabarvarzeshi.com/rss/tp/65",
+
+    # بوندسلیگا
     "https://www.khabarvarzeshi.com/rss/tp/66",
+
+    # سری آ
     "https://www.khabarvarzeshi.com/rss/tp/67",
+
+    # لیگ فرانسه
     "https://www.khabarvarzeshi.com/rss/tp/68",
+
+    # لیگ قهرمانان اروپا
     "https://www.khabarvarzeshi.com/rss/tp/75",
+
+    # لیگ اروپا
     "https://www.khabarvarzeshi.com/rss/tp/76",
+
+    # بازیکنان ایرانی خارج از کشور
     "https://www.khabarvarzeshi.com/rss/tp/111",
+
+    # لیگ یک ایران
     "https://www.khabarvarzeshi.com/rss/tp/110",
 
+    # جام حذفی ایران
+    "https://www.khabarvarzeshi.com/rss/tp/103",
+
+    # =========================
+    # 🇮🇷 SARPOOSH - IRAN FOOTBALL
+    # =========================
+
     "https://www.sarpoosh.com/rss/football.xml",
+
     "https://www.sarpoosh.com/rss/iran-pro-league.xml",
-    "https://www.sarpoosh.com/rss/football-world.xml",
-    "https://www.sarpoosh.com/rss/champions-league.xml",
+
     "https://www.sarpoosh.com/rss/football-transfers/iran.xml",
+
+    # =========================
+    # 🌍 WORLD FOOTBALL
+    # =========================
+
+    "https://www.sarpoosh.com/rss/football-world.xml",
+
+    "https://www.sarpoosh.com/rss/champions-league.xml",
+
     "https://www.sarpoosh.com/rss/football-transfers/world.xml",
 ]
 
 
-# ============================================================
-# NORMALIZE TITLE
-# ============================================================
-
-def normalize_title(title):
-
-    if not title:
-        return ""
-
-    title = clean_text(title)
-
-    # حذف نیم‌فاصله
-    title = title.replace("‌", "")
-
-    # یکسان‌سازی حروف عربی و فارسی
-    title = title.replace("ي", "ی")
-    title = title.replace("ى", "ی")
-    title = title.replace("ك", "ک")
-
-    # حذف علائم نگارشی
-    title = re.sub(
-        r"[^\w\s\u0600-\u06FF]",
-        " ",
-        title
-    )
-
-    # حذف فاصله‌های اضافی
-    title = re.sub(
-        r"\s+",
-        " ",
-        title
-    )
-
-    return title.strip().lower()
-
-
-# ============================================================
-# NEWS KEY
-# ============================================================
-
-def make_news_key(title):
-
-    normalized = normalize_title(title)
-
-    return "title:" + normalized
-
-
-# ============================================================
-# CHECK DUPLICATE
-# ============================================================
-
-def is_duplicate_news(
-    title,
-    link,
-    sent_news
-):
-
-    normalized_title = normalize_title(
-        title
-    )
-
-    news_key = make_news_key(
-        title
-    )
-
-    for item in sent_news:
-
-        # نسخه‌های قدیمی که فقط لینک ذخیره شده
-        if item == link:
-            return True
-
-        # عنوان‌های جدید
-        if item == news_key:
-            return True
-
-        # اگر ساختار دیکشنری بود
-        if isinstance(item, dict):
-
-            old_link = item.get(
-                "link",
-                ""
-            )
-
-            old_title = item.get(
-                "title",
-                ""
-            )
-
-            if old_link == link:
-                return True
-
-            if normalize_title(
-                old_title
-            ) == normalized_title:
-
-                return True
-
-    return False
-
-
-# ============================================================
-# API REQUEST
-# ============================================================
-
-def api_request(
-    endpoint,
-    params=None
-):
-
-    if not API_FOOTBALL_KEY:
-
-        print(
-            "⚠️ API_FOOTBALL_KEY پیدا نشد"
-        )
-
-        return None
-
-    url = API_BASE + endpoint
-
-    headers = {
-        "x-apisports-key":
-            API_FOOTBALL_KEY
-    }
-
-    try:
-
-        response = requests.get(
-            url,
-            headers=headers,
-            params=params or {},
-            timeout=REQUEST_TIMEOUT
-        )
-
-        print(
-            "API REQUEST:",
-            endpoint,
-            response.status_code
-        )
-
-        if response.status_code != 200:
-
-            print(
-                "API ERROR:",
-                response.text[:500]
-            )
-
-            return None
-
-        data = response.json()
-
-        if not isinstance(
-            data,
-            dict
-        ):
-
-            print(
-                "⚠️ API FORMAT ERROR"
-            )
-
-            return None
-
-        errors = data.get(
-            "errors",
-            {}
-        )
-
-        if errors:
-
-            print(
-                "API RESPONSE ERRORS:",
-                errors
-            )
-
-        return data
-
-    except Exception as error:
-
-        print(
-            "API REQUEST ERROR:",
-            error
-        )
-
-        return None
-
-
-# ============================================================
-# API STATUS
-# ============================================================
-
-def check_api_status():
-
-    print(
-        "================================"
-    )
-
-    print(
-        "CHECKING API-FOOTBALL"
-    )
-
-    data = api_request(
-        "/status"
-    )
-
-    if not data:
-
-        print(
-            "⚠️ API در دسترس نیست"
-        )
-
-        print(
-            "⚠️ ادامه ربات بدون LIVE"
-        )
-
-        return False
-
-    errors = data.get(
-        "errors",
-        {}
-    )
-
-    if errors:
-
-        print(
-            "⚠️ API RESPONSE ERRORS:",
-            errors
-        )
-
-        print(
-            "⚠️ LIVE غیرفعال شد"
-        )
-
-        print(
-            "⚠️ RSS ادامه پیدا می‌کند"
-        )
-
-        return False
-
-    response = data.get(
-        "response",
-        {}
-    )
-
-    if not isinstance(
-        response,
-        dict
-    ):
-
-        print(
-            "⚠️ API STATUS FORMAT ERROR"
-        )
-
-        return False
-
-    subscription = response.get(
-        "subscription",
-        {}
-    )
-
-    requests_info = response.get(
-        "requests",
-        {}
-    )
-
-    if not isinstance(
-        subscription,
-        dict
-    ):
-
-        subscription = {}
-
-    if not isinstance(
-        requests_info,
-        dict
-    ):
-
-        requests_info = {}
-
-    print(
-        "API PLAN:",
-        subscription.get(
-            "plan"
-        )
-    )
-
-    print(
-        "API REQUESTS TODAY:",
-        requests_info.get(
-            "current"
-        ),
-        "/",
-        requests_info.get(
-            "limit_day"
-        )
-    )
-
-    return True
-
-
-# ============================================================
-# LOAD SENT NEWS
-# ============================================================
-
-def load_sent_news():
-
-    if not os.path.exists(
-        SENT_FILE
-    ):
-
-        return []
-
-    try:
-
-        with open(
-            SENT_FILE,
-            "r",
-            encoding="utf-8"
-        ) as file:
-
-            data = json.load(
-                file
-            )
-
-        if isinstance(
-            data,
-            list
-        ):
-
-            return data
-
-    except Exception as error:
-
-        print(
-            "LOAD SENT ERROR:",
-            error
-        )
-
-    return []
-
-
-# ============================================================
-# SAVE SENT NEWS
-# ============================================================
-
-def save_sent_news(
-    sent_news
-):
-
-    try:
-
-        # فقط 2000 رکورد آخر
-        data = sent_news[-2000:]
-
-        with open(
-            SENT_FILE,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            json.dump(
-                data,
-                file,
-                ensure_ascii=False,
-                indent=2
-            )
-
-        print(
-            "✅ SENT NEWS DATABASE SAVED:",
-            len(data)
-        )
-
-    except Exception as error:
-
-        print(
-            "SAVE SENT ERROR:",
-            error
-        )
-
-
-# ============================================================
-# REGISTER SENT NEWS
-# ============================================================
-
-def register_sent_news(
-    sent_news,
-    title,
-    link
-):
-
-    news_key = make_news_key(
-        title
-    )
-
-    if link not in sent_news:
-
-        sent_news.append(
-            link
-        )
-
-    if news_key not in sent_news:
-
-        sent_news.append(
-            news_key
-        )
-
-    save_sent_news(
-        sent_news
-    )
-
-
-# ============================================================
-# CLEAN TEXT
-# ============================================================
-
-def clean_text(
-    text
-):
+# =========================================================
+# FOOTBALL KEYWORDS
+# =========================================================
+
+FOOTBALL_KEYWORDS = [
+
+    # 🇮🇷 ایران
+    "استقلال",
+    "پرسپولیس",
+    "سپاهان",
+    "تراکتور",
+    "ذوب آهن",
+    "ذوب‌آهن",
+    "گل گهر",
+    "گل‌گهر",
+    "فولاد",
+    "نساجی",
+    "ملوان",
+    "آلومینیوم",
+    "هوادار",
+    "شمس آذر",
+    "خیبر",
+    "چادرملو",
+    "استقلال خوزستان",
+    "پیکان",
+    "مس رفسنجان",
+    "مس کرمان",
+    "فجر سپاسی",
+    "شهر خودرو",
+
+    # تیم ملی
+    "تیم ملی",
+    "تیم‌ملی",
+    "ایران",
+    "ملی پوش",
+    "ملی‌پوش",
+    "امیر قلعه نویی",
+    "قلعه نویی",
+    "قلعه‌نویی",
+
+    # مسابقات ایران
+    "لیگ برتر",
+    "لیگ برتر ایران",
+    "جام حذفی",
+    "لیگ یک",
+    "آزادگان",
+    "فوتبال ایران",
+    "فوتبال کشور",
+
+    # نقل و انتقالات
+    "نقل و انتقالات",
+    "نقل‌وانتقالات",
+    "انتقالات",
+    "خرید",
+    "فروش",
+    "قرارداد",
+    "تمدید قرارداد",
+
+    # بازیکنان
+    "بازیکن",
+    "مربی",
+    "سرمربی",
+    "دروازه بان",
+    "دروازه‌بان",
+    "مهاجم",
+    "مدافع",
+    "هافبک",
+
+    # مسابقه
+    "گل",
+    "گلزنی",
+    "گلزن",
+    "بازی",
+    "دیدار",
+    "مسابقه",
+    "دربی",
+    "داربی",
+    "نتیجه",
+    "ترکیب",
+    "داور",
+    "کارت قرمز",
+    "کارت زرد",
+    "اخراج",
+    "VAR",
+    "وی ای آر",
+    "تعویض",
+
+    # 🌍 اروپا
+    "رئال مادرید",
+    "بارسلونا",
+    "اتلتیکو مادرید",
+    "منچستریونایتد",
+    "منچستر سیتی",
+    "لیورپول",
+    "آرسنال",
+    "چلسی",
+    "تاتنهام",
+    "بایرن مونیخ",
+    "دورتموند",
+    "اینتر",
+    "میلان",
+    "یوونتوس",
+    "ناپولی",
+    "پاری سن ژرمن",
+    "پاری‌سن‌ژرمن",
+
+    # لیگ‌ها
+    "لیگ قهرمانان اروپا",
+    "لیگ اروپا",
+    "پریمیرلیگ",
+    "لیگ انگلیس",
+    "لالیگا",
+    "سری آ",
+    "بوندسلیگا",
+    "لیگ فرانسه",
+
+    # بازیکنان معروف
+    "رونالدو",
+    "مسی",
+    "امباپه",
+    "هالند",
+    "نیمار",
+    "صلاح",
+    "بلینگام",
+    "وینیسیوس",
+]
+
+
+# =========================================================
+# NON FOOTBALL KEYWORDS
+# =========================================================
+
+NON_FOOTBALL_KEYWORDS = [
+
+    "والیبال",
+    "بسکتبال",
+    "کشتی",
+    "تنیس",
+    "فوتسال",
+    "بوکس",
+    "دوومیدانی",
+    "شنا",
+    "وزنه برداری",
+    "وزنه‌برداری",
+    "فرمول یک",
+    "موتورسواری",
+]
+
+
+# =========================================================
+# NORMALIZE TEXT
+# =========================================================
+
+def normalize_title(text):
 
     if not text:
         return ""
 
-    soup = BeautifulSoup(
-        text,
-        "html.parser"
-    )
+    text = html.unescape(str(text))
 
-    text = soup.get_text(
+    text = BeautifulSoup(text, "html.parser").get_text(" ")
+
+    text = text.replace("‌", " ")
+
+    text = text.replace("ي", "ی")
+    text = text.replace("ى", "ی")
+    text = text.replace("ك", "ک")
+
+    text = text.lower()
+
+    text = re.sub(
+        r"[^\w\s\u0600-\u06FF]",
         " ",
-        strip=True
+        text
     )
 
     text = re.sub(
@@ -578,521 +274,300 @@ def clean_text(
     return text.strip()
 
 
-# ============================================================
-# SHORTEN
-# ============================================================
+# =========================================================
+# SENT DATABASE
+# =========================================================
 
-def shorten_text(
-    text,
-    max_length=700
-):
+def load_sent_news():
 
-    text = clean_text(
-        text
-    )
+    if not os.path.exists(SENT_FILE):
+        return []
 
-    if not text:
-        return ""
+    try:
 
-    if len(text) <= max_length:
-        return text
+        with open(
+            SENT_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
 
-    text = text[:max_length]
+            data = json.load(f)
 
-    last_space = text.rfind(
-        " "
-    )
+            if isinstance(data, list):
+                return data
 
-    if last_space > 400:
+    except Exception as e:
 
-        text = text[
-            :last_space
-        ]
+        print("SENT FILE ERROR:", e)
 
-    return text + "..."
+    return []
 
 
-# ============================================================
-# FOOTBALL FILTER
-# ============================================================
+def save_sent_news(sent_news):
 
-def is_football_news(
-    title,
-    summary
-):
+    try:
 
-    title_text = clean_text(
-        title
-    ).lower()
+        with open(
+            SENT_FILE,
+            "w",
+            encoding="utf-8"
+        ) as f:
 
-    summary_text = clean_text(
-        summary
-    ).lower()
+            json.dump(
+                sent_news[-2000:],
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
 
-    for keyword in NON_FOOTBALL_KEYWORDS:
+    except Exception as e:
 
-        if keyword.lower() in title_text:
+        print("SAVE SENT ERROR:", e)
 
-            return False
 
-    for keyword in FOOTBALL_KEYWORDS:
+# =========================================================
+# DUPLICATE CHECK
+# =========================================================
 
-        if keyword.lower() in title_text:
+def is_duplicate_news(title, link, sent_news):
 
+    normalized = normalize_title(title)
+
+    title_key = "title:" + normalized
+
+    for item in sent_news:
+
+        if item == link:
             return True
 
-    hits = 0
+        if item == title_key:
+            return True
 
-    for keyword in FOOTBALL_KEYWORDS:
+        if isinstance(item, dict):
 
-        if keyword.lower() in summary_text:
+            old_link = item.get("link", "")
+            old_title = item.get("title", "")
 
-            hits += 1
-
-            if hits >= 2:
-
+            if old_link and old_link == link:
                 return True
 
+            if old_title:
+                if normalize_title(old_title) == normalized:
+                    return True
+
     return False
 
 
-# ============================================================
-# HASHTAGS
-# ============================================================
-
-def create_hashtags(
+def register_sent_news(
+    sent_news,
     title,
-    summary
+    link
 ):
 
-    text = (
+    normalized = normalize_title(title)
+
+    if link and link not in sent_news:
+        sent_news.append(link)
+
+    title_key = "title:" + normalized
+
+    if title_key not in sent_news:
+        sent_news.append(title_key)
+
+    save_sent_news(sent_news)
+
+
+# =========================================================
+# FOOTBALL FILTER
+# =========================================================
+
+def is_football_news(title, summary=""):
+
+    text = normalize_title(
         f"{title} {summary}"
-        .lower()
     )
 
-    found = []
+    # اگر صراحتاً مربوط به ورزش دیگری بود
+    for bad in NON_FOOTBALL_KEYWORDS:
 
-    keywords = sorted(
-        HASHTAG_KEYWORDS,
-        key=len,
-        reverse=True
-    )
+        if normalize_title(bad) in text:
 
-    for keyword in keywords:
+            # اگر همزمان کلمه فوتبال ایران/فوتبال داشت
+            if (
+                "فوتبال" not in text
+                and "استقلال" not in text
+                and "پرسپولیس" not in text
+                and "تیم ملی" not in text
+            ):
+                return False
 
-        if keyword.lower() in text:
-
-            hashtag = (
-                "#"
-                + keyword
-                .replace(" ", "_")
-                .replace("‌", "")
-            )
-
-            if hashtag not in found:
-
-                found.append(
-                    hashtag
-                )
-
-        if len(found) >= 5:
-
-            break
-
-    if "#فوتبال" not in found:
-
-        found.append(
-            "#فوتبال"
-        )
-
-    if "#اخبار_فوتبال" not in found:
-
-        found.append(
-            "#اخبار_فوتبال"
-        )
-
-    return " ".join(
-        found[:5]
-    )
-
-
-# ============================================================
-# RSS MEDIA
-# ============================================================
-
-def get_media_url(
-    entry
-):
-
-    media_content = entry.get(
-        "media_content",
-        []
-    )
-
-    for media in media_content:
-
-        url = media.get(
-            "url"
-        )
-
-        if url:
-            return url
-
-    media_thumbnail = entry.get(
-        "media_thumbnail",
-        []
-    )
-
-    for media in media_thumbnail:
-
-        url = media.get(
-            "url"
-        )
-
-        if url:
-            return url
-
-    enclosures = entry.get(
-        "enclosures",
-        []
-    )
-
-    for enclosure in enclosures:
-
-        url = (
-            enclosure.get("href")
-            or enclosure.get("url")
-        )
-
-        if url:
-            return url
-
-    summary = entry.get(
-        "summary",
-        ""
-    )
-
-    if summary:
-
-        soup = BeautifulSoup(
-            summary,
-            "html.parser"
-        )
-
-        image = soup.find(
-            "img"
-        )
-
-        if image:
-
-            url = (
-                image.get("src")
-                or image.get("data-src")
-            )
-
-            if url:
-                return url
-
-    return None
-
-
-# ============================================================
-# VIDEO URL
-# ============================================================
-
-def is_video_url(
-    url
-):
-
-    if not url:
-        return False
-
-    url_lower = url.lower()
-
-    extensions = [
-        ".mp4",
-        ".m4v",
-        ".mov",
-        ".webm",
-        ".avi",
-        ".mkv"
+    # خبرهای فوتبال ایران
+    iran_words = [
+        "استقلال",
+        "پرسپولیس",
+        "سپاهان",
+        "تراکتور",
+        "ذوب آهن",
+        "ذوب‌آهن",
+        "گل گهر",
+        "گل‌گهر",
+        "فولاد",
+        "نساجی",
+        "ملوان",
+        "آلومینیوم",
+        "هوادار",
+        "شمس آذر",
+        "خیبر",
+        "چادرملو",
+        "تیم ملی",
+        "لیگ برتر",
+        "جام حذفی",
+        "لیگ یک",
+        "آزادگان",
+        "فوتبال ایران",
     ]
 
-    for extension in extensions:
+    for word in iran_words:
 
-        if extension in url_lower:
-
+        if normalize_title(word) in text:
             return True
 
-    words = [
-        "mp4",
-        "/video/",
-        "/videos/",
-        "video_url",
-        "video-url",
-        "videourl"
-    ]
+    # خبرهای فوتبال اروپا
+    for word in FOOTBALL_KEYWORDS:
 
-    for word in words:
-
-        if word in url_lower:
-
+        if normalize_title(word) in text:
             return True
+
+    # خود کلمه فوتبال
+    if "فوتبال" in text:
+        return True
 
     return False
 
 
-# ============================================================
-# APARAT HASH
-# ============================================================
+# =========================================================
+# GET RSS NEWS
+# =========================================================
 
-def extract_aparat_hash(
-    article_url,
-    html
-):
+def get_news():
 
-    iframe_matches = re.findall(
-        r'<iframe[^>]+src=["\']([^"\']+)["\']',
-        html,
-        flags=re.IGNORECASE
-    )
+    all_news = []
 
-    for iframe_url in iframe_matches:
+    seen_urls = set()
+    seen_titles = set()
 
-        if "aparat.com" not in iframe_url.lower():
+    for rss_url in RSS_SOURCES:
 
-            continue
+        print("\nRSS:", rss_url)
 
-        print(
-            "APARAT IFRAME:",
-            iframe_url
-        )
+        try:
 
-        match = re.search(
-            r"videohash/([A-Za-z0-9_-]+)",
-            iframe_url,
-            flags=re.IGNORECASE
-        )
+            response = requests.get(
+                rss_url,
+                timeout=20,
+                headers={
+                    "User-Agent":
+                    "Mozilla/5.0"
+                }
+            )
 
-        if match:
+            print(
+                "RSS STATUS:",
+                response.status_code
+            )
 
-            video_hash = match.group(1)
+            if response.status_code != 200:
+                continue
 
-            if video_hash.lower() != "video":
+            feed = feedparser.parse(
+                response.content
+            )
 
-                print(
-                    "APARAT VIDEO HASH FOUND:",
-                    video_hash
+            for entry in feed.entries[:20]:
+
+                title = (
+                    entry.get("title")
+                    or ""
+                ).strip()
+
+                link = (
+                    entry.get("link")
+                    or ""
+                ).strip()
+
+                summary = (
+                    entry.get("summary")
+                    or entry.get("description")
+                    or ""
                 )
 
-                return video_hash
+                if not title or not link:
+                    continue
 
-        match = re.search(
-            r"aparat\.com/(?:v|video)/([A-Za-z0-9_-]+)",
-            iframe_url,
-            flags=re.IGNORECASE
-        )
+                normalized = normalize_title(
+                    title
+                )
 
-        if match:
+                # تکراری داخل همین اجرا
+                if link in seen_urls:
+                    continue
 
-            video_hash = match.group(1)
+                if normalized in seen_titles:
+                    continue
 
-            if video_hash.lower() != "video":
+                # فقط فوتبال
+                if not is_football_news(
+                    title,
+                    summary
+                ):
+                    print(
+                        "NOT FOOTBALL:",
+                        title[:100]
+                    )
+                    continue
 
-                return video_hash
+                seen_urls.add(link)
+                seen_titles.add(normalized)
 
-    matches = re.findall(
-        r'videohash[/"\':= ]+([A-Za-z0-9_-]+)',
-        html,
-        flags=re.IGNORECASE
-    )
+                all_news.append({
+                    "title": title,
+                    "link": link,
+                    "summary": summary,
+                    "source": rss_url,
+                    "entry": entry,
+                })
 
-    for video_hash in matches:
+        except Exception as e:
 
-        if video_hash.lower() == "video":
-            continue
-
-        if len(video_hash) < 4:
-            continue
-
-        print(
-            "APARAT VIDEO HASH FOUND:",
-            video_hash
-        )
-
-        return video_hash
-
-    matches = re.findall(
-        r"https?://(?:www\.)?aparat\.com/v/([A-Za-z0-9_-]+)",
-        html,
-        flags=re.IGNORECASE
-    )
-
-    for video_hash in matches:
-
-        if video_hash.lower() == "video":
-            continue
-
-        return video_hash
-
-    return None
-
-
-# ============================================================
-# APARAT API
-# ============================================================
-
-def get_aparat_video(
-    video_hash
-):
-
-    if not video_hash:
-        return None
-
-    api_url = (
-        "https://www.aparat.com/"
-        "api/fa/v1/video/video/show/"
-        "videohash/"
-        + video_hash
-    )
+            print(
+                "RSS ERROR:",
+                rss_url,
+                e
+            )
 
     print(
-        "APARAT API:",
-        api_url
+        "\nTOTAL UNIQUE FOOTBALL NEWS:",
+        len(all_news)
     )
+
+    return all_news
+
+
+# =========================================================
+# ARTICLE CONTENT
+# =========================================================
+
+def get_article_content(url):
 
     try:
 
         response = requests.get(
-            api_url,
-            timeout=REQUEST_TIMEOUT,
-            headers=HEADERS
-        )
-
-        print(
-            "APARAT API STATUS:",
-            response.status_code
-        )
-
-        if response.status_code != 200:
-
-            return None
-
-        data = response.json()
-
-        attributes = (
-            data
-            .get("data", {})
-            .get("attributes", {})
-        )
-
-        if not attributes:
-
-            return None
-
-        print(
-            "APARAT TITLE:",
-            attributes.get(
-                "title",
-                ""
-            )
-        )
-
-        print(
-            "APARAT DURATION:",
-            attributes.get(
-                "duration",
-                ""
-            )
-        )
-
-        file_link_all = attributes.get(
-            "file_link_all",
-            []
-        )
-
-        if file_link_all:
-
-            profiles = sorted(
-                file_link_all,
-                key=lambda item:
-                    0
-                    if item.get(
-                        "profile"
-                    ) == "240p"
-                    else 1
-            )
-
-            for profile in profiles:
-
-                profile_name = profile.get(
-                    "profile",
-                    ""
-                )
-
-                urls = profile.get(
-                    "urls",
-                    []
-                )
-
-                print(
-                    "APARAT PROFILE:",
-                    profile_name
-                )
-
-                for url in urls:
-
-                    if url:
-
-                        print(
-                            "APARAT MP4 FOUND:",
-                            profile_name
-                        )
-
-                        return url
-
-        file_link = attributes.get(
-            "file_link"
-        )
-
-        if file_link and is_video_url(
-            file_link
-        ):
-
-            return file_link
-
-    except Exception as error:
-
-        print(
-            "APARAT API ERROR:",
-            error
-        )
-
-    print(
-        "APARAT MP4 NOT FOUND"
-    )
-
-    return None
-
-
-# ============================================================
-# GET VIDEO
-# ============================================================
-
-def get_video_url(
-    article_url
-):
-
-    if not article_url:
-        return None
-
-    try:
-
-        response = requests.get(
-            article_url,
-            timeout=REQUEST_TIMEOUT,
-            headers=HEADERS,
-            allow_redirects=True
+            url,
+            timeout=20,
+            headers={
+                "User-Agent":
+                "Mozilla/5.0"
+            }
         )
 
         print(
@@ -1103,543 +578,521 @@ def get_video_url(
         print(
             "ARTICLE CONTENT TYPE:",
             response.headers.get(
-                "content-type",
-                ""
+                "content-type"
             )
         )
 
-        response.raise_for_status()
-
-        content_type = (
-            response.headers
-            .get(
-                "content-type",
-                ""
-            )
-            .lower()
-        )
-
-        if content_type.startswith(
-            "video/"
-        ):
-
-            print(
-                "DIRECT VIDEO FOUND"
-            )
-
-            return response.url
-
-        html = response.text
+        if response.status_code != 200:
+            return ""
 
         soup = BeautifulSoup(
-            html,
+            response.text,
             "html.parser"
         )
 
-        video_hash = extract_aparat_hash(
-            article_url,
-            html
+        for tag in soup(
+            [
+                "script",
+                "style",
+                "noscript"
+            ]
+        ):
+            tag.decompose()
+
+        text = soup.get_text(
+            " ",
+            strip=True
         )
 
-        if video_hash:
+        return text
 
-            aparat_url = get_aparat_video(
-                video_hash
-            )
-
-            if aparat_url:
-
-                print(
-                    "✅ APARAT MP4 URL FOUND"
-                )
-
-                return aparat_url
-
-        og_names = [
-            "og:video",
-            "og:video:url",
-            "og:video:secure_url"
-        ]
-
-        for name in og_names:
-
-            tag = soup.find(
-                "meta",
-                attrs={
-                    "property": name
-                }
-            )
-
-            if not tag:
-
-                tag = soup.find(
-                    "meta",
-                    attrs={
-                        "name": name
-                    }
-                )
-
-            if tag:
-
-                url = tag.get(
-                    "content"
-                )
-
-                if url:
-
-                    url = urljoin(
-                        article_url,
-                        url
-                    )
-
-                    if is_video_url(
-                        url
-                    ):
-
-                        return url
-
-        videos = soup.find_all(
-            "video"
-        )
-
-        for video in videos:
-
-            candidates = []
-
-            src = video.get(
-                "src"
-            )
-
-            if src:
-                candidates.append(
-                    src
-                )
-
-            data_src = video.get(
-                "data-src"
-            )
-
-            if data_src:
-
-                candidates.append(
-                    data_src
-                )
-
-            for source in video.find_all(
-                "source"
-            ):
-
-                src = (
-                    source.get("src")
-                    or source.get("data-src")
-                )
-
-                if src:
-
-                    candidates.append(
-                        src
-                    )
-
-            for url in candidates:
-
-                url = urljoin(
-                    article_url,
-                    url
-                )
-
-                if is_video_url(
-                    url
-                ):
-
-                    return url
-
-        sources = soup.find_all(
-            "source"
-        )
-
-        for source in sources:
-
-            url = (
-                source.get("src")
-                or source.get("data-src")
-            )
-
-            if not url:
-                continue
-
-            url = urljoin(
-                article_url,
-                url
-            )
-
-            if is_video_url(
-                url
-            ):
-
-                return url
-
-    except Exception as error:
+    except Exception as e:
 
         print(
-            "VIDEO PAGE ERROR:",
-            error
+            "ARTICLE ERROR:",
+            e
         )
 
-    print(
-        "VIDEO NOT FOUND"
-    )
+        return ""
+
+
+# =========================================================
+# APARAT VIDEO
+# =========================================================
+
+def get_aparat_video(url):
+
+    try:
+
+        response = requests.get(
+            url,
+            timeout=20,
+            headers={
+                "User-Agent":
+                "Mozilla/5.0"
+            }
+        )
+
+        if response.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
+
+        iframe = soup.find(
+            "iframe",
+            src=re.compile(
+                r"aparat\.com"
+            )
+        )
+
+        if not iframe:
+            return None
+
+        iframe_url = iframe.get(
+            "src",
+            ""
+        )
+
+        print(
+            "APARAT IFRAME:",
+            iframe_url
+        )
+
+        match = re.search(
+            r"/videohash/([^/]+)",
+            iframe_url
+        )
+
+        if not match:
+            return None
+
+        video_hash = match.group(1)
+
+        print(
+            "APARAT VIDEO HASH FOUND:",
+            video_hash
+        )
+
+        api_url = (
+            "https://www.aparat.com/"
+            "api/fa/v1/video/video/show/"
+            f"videohash/{video_hash}"
+        )
+
+        api_response = requests.get(
+            api_url,
+            timeout=20,
+            headers={
+                "User-Agent":
+                "Mozilla/5.0"
+            }
+        )
+
+        print(
+            "APARAT API STATUS:",
+            api_response.status_code
+        )
+
+        if api_response.status_code != 200:
+            return None
+
+        data = api_response.json()
+
+        # جستجوی لینک mp4
+        def find_mp4(obj):
+
+            if isinstance(obj, dict):
+
+                for key, value in obj.items():
+
+                    if isinstance(
+                        value,
+                        str
+                    ):
+
+                        if (
+                            ".mp4" in value
+                        ):
+                            return value
+
+                    result = find_mp4(
+                        value
+                    )
+
+                    if result:
+                        return result
+
+            elif isinstance(
+                obj,
+                list
+            ):
+
+                for value in obj:
+
+                    result = find_mp4(
+                        value
+                    )
+
+                    if result:
+                        return result
+
+            return None
+
+        mp4 = find_mp4(data)
+
+        if mp4:
+
+            print(
+                "APARAT MP4 FOUND"
+            )
+
+            return mp4
+
+    except Exception as e:
+
+        print(
+            "APARAT ERROR:",
+            e
+        )
 
     return None
 
 
-# ============================================================
-# GET NEWS
-# ============================================================
+# =========================================================
+# IMAGE FROM RSS
+# =========================================================
 
-def get_news():
-
-    all_news = []
-
-    seen_links = set()
-
-    seen_titles = set()
-
-    for rss_url in RSS_SOURCES:
-
-        try:
-
-            print(
-                "================================"
-            )
-
-            print(
-                "READING RSS:",
-                rss_url
-            )
-
-            response = requests.get(
-                rss_url,
-                timeout=15,
-                headers=HEADERS
-            )
-
-            print(
-                "RSS STATUS:",
-                response.status_code
-            )
-
-            response.raise_for_status()
-
-            feed = feedparser.parse(
-                response.content
-            )
-
-            for entry in feed.entries:
-
-                title = clean_text(
-                    entry.get(
-                        "title",
-                        ""
-                    )
-                )
-
-                summary = clean_text(
-                    entry.get(
-                        "summary",
-                        ""
-                    )
-                )
-
-                link = entry.get(
-                    "link",
-                    ""
-                ).strip()
-
-                if not title or not link:
-
-                    continue
-
-                if not is_football_news(
-                    title,
-                    summary
-                ):
-
-                    continue
-
-                normalized_title = normalize_title(
-                    title
-                )
-
-                if link in seen_links:
-
-                    continue
-
-                if normalized_title in seen_titles:
-
-                    continue
-
-                seen_links.add(
-                    link
-                )
-
-                seen_titles.add(
-                    normalized_title
-                )
-
-                all_news.append({
-                    "title": title,
-                    "summary": summary,
-                    "link": link,
-                    "media_url":
-                        get_media_url(
-                            entry
-                        )
-                })
-
-        except Exception as error:
-
-            print(
-                "RSS ERROR:",
-                rss_url
-            )
-
-            print(
-                error
-            )
-
-    print(
-        "TOTAL UNIQUE FOOTBALL NEWS:",
-        len(all_news)
-    )
-
-    return all_news
-
-
-# ============================================================
-# SEND TEXT
-# ============================================================
-
-async def send_text(
-    bot,
-    text
-):
+def get_entry_image(entry):
 
     try:
 
-        await bot.send_message(
-            chat_id=CHANNEL,
-            text=text,
-            parse_mode="HTML",
-            disable_web_page_preview=True
+        media_content = entry.get(
+            "media_content"
         )
 
-        return True
+        if media_content:
 
-    except Exception as error:
+            for media in media_content:
+
+                url = media.get(
+                    "url"
+                )
+
+                if url:
+                    return url
+
+        media_thumbnail = entry.get(
+            "media_thumbnail"
+        )
+
+        if media_thumbnail:
+
+            for media in media_thumbnail:
+
+                url = media.get(
+                    "url"
+                )
+
+                if url:
+                    return url
+
+        enclosures = entry.get(
+            "enclosures"
+        )
+
+        if enclosures:
+
+            for enclosure in enclosures:
+
+                url = enclosure.get(
+                    "href"
+                ) or enclosure.get(
+                    "url"
+                )
+
+                if url:
+                    return url
+
+    except Exception as e:
 
         print(
-            "SEND TEXT ERROR:",
-            error
+            "IMAGE ERROR:",
+            e
         )
 
-        return False
+    return None
 
 
-# ============================================================
-# CREATE MESSAGE
-# ============================================================
+# =========================================================
+# TELEGRAM SEND
+# =========================================================
 
-def create_message(
+def send_news(
+    bot,
     news
 ):
 
     title = news["title"]
+    link = news["link"]
 
-    summary = shorten_text(
-        news["summary"]
+    entry = news["entry"]
+
+    print(
+        "\nPROCESSING:",
+        title
     )
 
-    hashtags = create_hashtags(
-        title,
-        summary
-    )
+    # -----------------------------------------------------
+    # APARAT VIDEO
+    # -----------------------------------------------------
 
-    logo = (
-        '<tg-emoji emoji-id="'
-        + CUSTOM_EMOJI_ID
-        + '">🏆</tg-emoji>'
-    )
-
-    message = (
-        logo
-        + " <b>"
-        + title
-        + "</b>\n\n"
-    )
-
-    if summary:
-
-        message += (
-            summary
-            + "\n\n"
-        )
-
-    message += (
-        hashtags
-        + "\n\n"
-        + "📢 @ligebartar24"
-    )
-
-    return message
-
-
-# ============================================================
-# SEND MEDIA
-# ============================================================
-
-async def send_media(
-    bot,
-    media_url,
-    caption
-):
-
-    if not media_url:
-
-        return False
+    video_url = None
 
     try:
 
-        print(
-            "MEDIA URL:",
-            media_url
+        video_url = get_aparat_video(
+            link
         )
 
-        response = requests.get(
-            media_url,
-            timeout=REQUEST_TIMEOUT,
-            headers=HEADERS,
-            allow_redirects=True
-        )
+    except Exception as e:
 
         print(
-            "MEDIA STATUS:",
-            response.status_code
+            "VIDEO CHECK ERROR:",
+            e
         )
 
-        response.raise_for_status()
+    if video_url:
 
-        content_type = (
-            response.headers
-            .get(
-                "content-type",
-                ""
+        try:
+
+            media_response = requests.get(
+                video_url,
+                timeout=60,
+                stream=True,
+                headers={
+                    "User-Agent":
+                    "Mozilla/5.0"
+                }
             )
-            .lower()
-        )
 
-        print(
-            "MEDIA CONTENT TYPE:",
-            content_type
-        )
+            print(
+                "MEDIA STATUS:",
+                media_response.status_code
+            )
 
-        print(
-            "MEDIA CONTENT LENGTH:",
-            len(response.content)
-        )
+            print(
+                "MEDIA CONTENT TYPE:",
+                media_response.headers.get(
+                    "content-type"
+                )
+            )
 
-        if content_type.startswith(
-            "image/"
-        ):
+            if (
+                media_response.status_code == 200
+                and "video" in
+                media_response.headers.get(
+                    "content-type",
+                    ""
+                )
+            ):
 
-            await bot.send_photo(
-                chat_id=CHANNEL,
-                photo=response.content,
-                caption=caption,
-                parse_mode="HTML"
+                temp_file = (
+                    "temp_video.mp4"
+                )
+
+                with open(
+                    temp_file,
+                    "wb"
+                ) as f:
+
+                    for chunk in media_response.iter_content(
+                        chunk_size=1024 * 1024
+                    ):
+
+                        if chunk:
+                            f.write(chunk)
+
+                print(
+                    "✅ VIDEO DOWNLOADED"
+                )
+
+                caption = (
+                    f"⚽️ <b>{html.escape(title)}</b>\n\n"
+                    f"🔗 {html.escape(link)}\n\n"
+                    f"@ligebartar24"
+                )
+
+                with open(
+                    temp_file,
+                    "rb"
+                ) as video_file:
+
+                    await_send_video(
+                        bot,
+                        video_file,
+                        caption
+                    )
+
+                try:
+                    os.remove(
+                        temp_file
+                    )
+                except:
+                    pass
+
+                print(
+                    "✅ VIDEO NEWS SENT:",
+                    title
+                )
+
+                return True
+
+        except Exception as e:
+
+            print(
+                "VIDEO SEND ERROR:",
+                e
+            )
+
+    # -----------------------------------------------------
+    # IMAGE
+    # -----------------------------------------------------
+
+    image_url = get_entry_image(
+        entry
+    )
+
+    caption = (
+        f"⚽️ <b>{html.escape(title)}</b>\n\n"
+        f"🔗 {html.escape(link)}\n\n"
+        f"@ligebartar24"
+    )
+
+    try:
+
+        if image_url:
+
+            await_send_photo(
+                bot,
+                image_url,
+                caption
             )
 
             print(
                 "✅ PHOTO SENT"
             )
 
-            return True
+        else:
 
-        if content_type.startswith(
-            "video/"
-        ):
-
-            await bot.send_video(
-                chat_id=CHANNEL,
-                video=response.content,
-                caption=caption,
-                parse_mode="HTML",
-                supports_streaming=True
+            await_send_message(
+                bot,
+                caption
             )
 
             print(
-                "✅ VIDEO SENT"
+                "✅ TEXT NEWS SENT"
             )
-
-            return True
-
-        if is_video_url(
-            media_url
-        ):
-
-            await bot.send_video(
-                chat_id=CHANNEL,
-                video=response.content,
-                caption=caption,
-                parse_mode="HTML",
-                supports_streaming=True
-            )
-
-            print(
-                "✅ VIDEO SENT BY URL"
-            )
-
-            return True
-
-    except Exception as error:
 
         print(
-            "MEDIA ERROR:",
-            error
+            "NEWS SENT:",
+            title
         )
 
-    return False
+        return True
+
+    except Exception as e:
+
+        print(
+            "TELEGRAM SEND ERROR:",
+            e
+        )
+
+        return False
 
 
-# ============================================================
-# PROCESS RSS
-# ============================================================
+# =========================================================
+# ASYNC HELPERS
+# =========================================================
 
-async def process_rss_news(
+import asyncio
+
+
+def await_send_message(
     bot,
-    sent_news
+    text
 ):
 
-    news_list = get_news()
+    asyncio.get_event_loop().run_until_complete(
+        bot.send_message(
+            chat_id=CHANNEL,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=False
+        )
+    )
+
+
+def await_send_photo(
+    bot,
+    photo,
+    caption
+):
+
+    asyncio.get_event_loop().run_until_complete(
+        bot.send_photo(
+            chat_id=CHANNEL,
+            photo=photo,
+            caption=caption,
+            parse_mode=ParseMode.HTML
+        )
+    )
+
+
+def await_send_video(
+    bot,
+    video,
+    caption
+):
+
+    asyncio.get_event_loop().run_until_complete(
+        bot.send_video(
+            chat_id=CHANNEL,
+            video=video,
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+            supports_streaming=True
+        )
+    )
+
+
+# =========================================================
+# PROCESS RSS
+# =========================================================
+
+def process_rss_news():
+
+    sent_news = load_sent_news()
 
     print(
-        "FOOTBALL NEWS FOUND:",
-        len(news_list)
+        "\nSENT DATABASE COUNT:",
+        len(sent_news)
     )
+
+    news_list = get_news()
 
     sent_count = 0
 
     for news in news_list:
 
-        if sent_count >= MAX_NEWS_PER_RUN:
-
-            break
-
         title = news["title"]
         link = news["link"]
 
-        # --------------------------------------------
-        # ضد تکرار
-        # --------------------------------------------
+        # ---------------------------------------------
+        # DUPLICATE
+        # ---------------------------------------------
 
         if is_duplicate_news(
             title,
@@ -1655,438 +1108,141 @@ async def process_rss_news(
             continue
 
         print(
-            "================================"
-        )
-
-        print(
-            "PROCESSING:",
+            "\nNEW NEWS:",
             title
         )
 
-        message = create_message(
-            news
+        bot = Bot(
+            token=BOT_TOKEN
         )
 
-        media_sent = False
+        try:
 
-        # --------------------------------------------
-        # VIDEO
-        # --------------------------------------------
+            success = send_news(
+                bot,
+                news
+            )
 
-        video_url = get_video_url(
-            link
-        )
+            if success:
 
-        if video_url:
+                register_sent_news(
+                    sent_news,
+                    title,
+                    link
+                )
+
+                sent_count += 1
+
+                print(
+                    "✅ SAVED TO DATABASE"
+                )
+
+                # جلوگیری از ارسال سریع تعداد زیاد
+                time.sleep(2)
+
+        except Exception as e:
 
             print(
-                "VIDEO FOUND:",
-                video_url
+                "PROCESS ERROR:",
+                e
             )
 
-            media_sent = await send_media(
-                bot,
-                video_url,
-                message
-            )
-
-            if media_sent:
-
-                print(
-                    "✅ VIDEO NEWS SENT"
-                )
-
-        # --------------------------------------------
-        # RSS IMAGE
-        # --------------------------------------------
-
-        if not media_sent:
-
-            rss_media = news.get(
-                "media_url"
-            )
-
-            if rss_media:
-
-                print(
-                    "TRY RSS MEDIA:",
-                    rss_media
-                )
-
-                media_sent = await send_media(
-                    bot,
-                    rss_media,
-                    message
-                )
-
-        # --------------------------------------------
-        # TEXT
-        # --------------------------------------------
-
-        if not media_sent:
-
-            text_sent = await send_text(
-                bot,
-                message
-            )
-
-            if text_sent:
-
-                print(
-                    "✅ TEXT SENT"
-                )
-
-        # --------------------------------------------
-        # ثبت قطعی خبر
-        # --------------------------------------------
-
-        register_sent_news(
-            sent_news,
-            title,
-            link
-        )
-
-        sent_count += 1
-
-        print(
-            "NEWS SENT:",
-            title
-        )
-
-        await asyncio.sleep(
-            2
-        )
+    print(
+        "\nRSS SENT COUNT:",
+        sent_count
+    )
 
     return sent_count
 
 
-# ============================================================
-# LIVE
-# ============================================================
+# =========================================================
+# API FOOTBALL STATUS
+# =========================================================
 
-def get_live_matches():
+def check_api_status():
 
-    print(
-        "================================"
-    )
-
-    print(
-        "CHECKING LIVE FOOTBALL MATCHES"
-    )
-
-    data = api_request(
-        "/fixtures",
-        {
-            "live": "all"
-        }
-    )
-
-    if not data:
-
-        return []
-
-    if data.get(
-        "errors"
-    ):
-
-        return []
-
-    fixtures = data.get(
-        "response",
-        []
-    )
-
-    if not isinstance(
-        fixtures,
-        list
-    ):
-
-        return []
-
-    print(
-        "LIVE MATCHES:",
-        len(fixtures)
-    )
-
-    return fixtures
-
-
-# ============================================================
-# LIVE EVENT TEXT
-# ============================================================
-
-def translate_event_type(
-    event
-):
-
-    event_type = event.get(
-        "type",
-        ""
-    )
-
-    detail = event.get(
-        "detail",
-        ""
-    )
-
-    player = (
-        event
-        .get("player", {})
-        .get("name", "")
-    )
-
-    assist = (
-        event
-        .get("assist", {})
-        .get("name", "")
-    )
-
-    team = (
-        event
-        .get("team", {})
-        .get("name", "")
-    )
-
-    minute = (
-        event
-        .get("time", {})
-        .get("elapsed", "")
-    )
-
-    if event_type == "Goal":
-
-        text = (
-            f"⚽ <b>گل در دقیقه {minute}!</b>\n"
-            f"👤 {player}\n"
-            f"🏟 {team}"
-        )
-
-        if assist:
-
-            text += (
-                f"\n🎯 پاس گل: {assist}"
-            )
-
-        return text
-
-    if event_type == "Card":
-
-        if "Red" in detail:
-
-            return (
-                f"🟥 <b>کارت قرمز</b> "
-                f"در دقیقه {minute}\n"
-                f"👤 {player}\n"
-                f"🏟 {team}"
-            )
-
-        return (
-            f"🟨 <b>کارت زرد</b> "
-            f"در دقیقه {minute}\n"
-            f"👤 {player}\n"
-            f"🏟 {team}"
-        )
-
-    if event_type == "subst":
-
-        player_out = (
-            event
-            .get("player", {})
-            .get("name", "")
-        )
-
-        player_in = (
-            event
-            .get("assist", {})
-            .get("name", "")
-        )
-
-        return (
-            f"🔄 <b>تعویض</b> "
-            f"در دقیقه {minute}\n"
-            f"⬅️ {player_out}\n"
-            f"➡️ {player_in}"
-        )
-
-    return None
-
-
-# ============================================================
-# LIVE MESSAGE
-# ============================================================
-
-def create_live_match_message(
-    fixture,
-    event
-):
-
-    teams = fixture.get(
-        "teams",
-        {}
-    )
-
-    home = (
-        teams.get("home", {})
-        .get("name", "تیم میزبان")
-    )
-
-    away = (
-        teams.get("away", {})
-        .get("name", "تیم مهمان")
-    )
-
-    goals = fixture.get(
-        "goals",
-        {}
-    )
-
-    home_goals = goals.get(
-        "home",
-        0
-    )
-
-    away_goals = goals.get(
-        "away",
-        0
-    )
-
-    event_text = translate_event_type(
-        event
-    )
-
-    if not event_text:
-
-        return None
-
-    logo = (
-        '<tg-emoji emoji-id="'
-        + CUSTOM_EMOJI_ID
-        + '">🏆</tg-emoji>'
-    )
-
-    return (
-        logo
-        + " <b>⚽ اتفاق مهم در بازی</b>\n\n"
-        + f"🏠 {home}  {home_goals}\n"
-        + f"✈️ {away}  {away_goals}\n\n"
-        + event_text
-        + "\n\n"
-        + "#فوتبال #نتیجه_زنده\n\n"
-        + "📢 @ligebartar24"
-    )
-
-
-# ============================================================
-# PROCESS LIVE
-# ============================================================
-
-async def process_live_matches(
-    bot,
-    sent_news
-):
-
-    fixtures = get_live_matches()
-
-    if not fixtures:
+    if not API_FOOTBALL_KEY:
 
         print(
-            "⚠️ NO LIVE MATCHES"
+            "⚠️ API FOOTBALL KEY NOT FOUND"
         )
 
-        return 0
+        return False
 
-    event_sent = 0
+    url = (
+        "https://v3.football.api-sports.io/status"
+    )
 
-    for fixture in fixtures:
+    headers = {
+        "x-apisports-key":
+        API_FOOTBALL_KEY
+    }
 
-        fixture_id = (
-            fixture
-            .get("fixture", {})
-            .get("id")
+    try:
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=20
         )
 
-        if not fixture_id:
-
-            continue
-
-        data = api_request(
-            "/fixtures/events",
-            {
-                "fixture":
-                    fixture_id
-            }
+        print(
+            "API REQUEST: /status",
+            response.status_code
         )
 
-        if not data:
+        data = response.json()
 
-            continue
+        print(
+            "API RESPONSE:",
+            data
+        )
 
-        events = data.get(
-            "response",
-            []
+        if data.get("errors"):
+
+            print(
+                "⚠️ API ERROR:",
+                data["errors"]
+            )
+
+            print(
+                "RSS NEWS WILL CONTINUE"
+            )
+
+            return False
+
+        result = data.get(
+            "response"
         )
 
         if not isinstance(
-            events,
-            list
+            result,
+            dict
         ):
 
-            continue
-
-        for event in events:
-
-            event_id = (
-                f"event_{fixture_id}_"
-                f"{event.get('time', {}).get('elapsed', '')}_"
-                f"{event.get('type', '')}_"
-                f"{event.get('player', {}).get('id', '')}"
+            print(
+                "⚠️ UNEXPECTED API RESPONSE"
             )
 
-            if event_id in sent_news:
+            return False
 
-                continue
+        return True
 
-            message = create_live_match_message(
-                fixture,
-                event
-            )
+    except Exception as e:
 
-            if not message:
+        print(
+            "API STATUS ERROR:",
+            e
+        )
 
-                continue
-
-            if await send_text(
-                bot,
-                message
-            ):
-
-                sent_news.append(
-                    event_id
-                )
-
-                save_sent_news(
-                    sent_news
-                )
-
-                event_sent += 1
-
-                print(
-                    "✅ LIVE EVENT SENT:",
-                    event_id
-                )
-
-    return event_sent
+        return False
 
 
-# ============================================================
+# =========================================================
 # MAIN
-# ============================================================
+# =========================================================
 
-async def main():
-
-    print(
-        "================================"
-    )
+def main():
 
     print(
         "TELEGRAM SPORTS NEWS BOT"
@@ -2096,117 +1252,47 @@ async def main():
         "================================"
     )
 
-    if not BOT_TOKEN:
-
-        print(
-            "❌ BOT_TOKEN پیدا نشد"
-        )
-
-        return
-
-    if not CHANNEL:
-
-        print(
-            "❌ CHANNEL پیدا نشد"
-        )
-
-        return
-
-    sent_news = load_sent_news()
-
     print(
-        "SENT DATABASE COUNT:",
-        len(sent_news)
+        "🇮🇷 IRAN + 🌍 EUROPE FOOTBALL"
     )
-
-    bot = Bot(
-        token=BOT_TOKEN
-    )
-
-    # --------------------------------------------------------
-    # API
-    # --------------------------------------------------------
-
-    api_ok = False
-
-    if API_FOOTBALL_KEY:
-
-        api_ok = check_api_status()
-
-    else:
-
-        print(
-            "⚠️ API_FOOTBALL_KEY پیدا نشد"
-        )
-
-        print(
-            "⚠️ LIVE غیرفعال است"
-        )
-
-    # --------------------------------------------------------
-    # LIVE
-    # --------------------------------------------------------
-
-    live_sent = 0
-
-    if api_ok:
-
-        try:
-
-            live_sent = await process_live_matches(
-                bot,
-                sent_news
-            )
-
-        except Exception as error:
-
-            print(
-                "⚠️ LIVE ERROR:",
-                error
-            )
-
-            print(
-                "⚠️ ادامه با RSS"
-            )
-
-    else:
-
-        print(
-            "⚠️ LIVE اجرا نشد"
-        )
-
-    # --------------------------------------------------------
-    # RSS
-    # --------------------------------------------------------
-
-    try:
-
-        news_sent = await process_rss_news(
-            bot,
-            sent_news
-        )
-
-    except Exception as error:
-
-        print(
-            "⚠️ RSS PROCESS ERROR:",
-            error
-        )
-
-        news_sent = 0
-
-    # --------------------------------------------------------
-    # FINISH
-    # --------------------------------------------------------
 
     print(
         "================================"
+    )
+
+    if not BOT_TOKEN:
+
+        print(
+            "❌ BOT_TOKEN NOT FOUND"
+        )
+
+        return
+
+    api_ok = check_api_status()
+
+    if not api_ok:
+
+        print(
+            "⚠️ API FOOTBALL UNAVAILABLE"
+        )
+
+        print(
+            "➡️ RSS NEWS WILL STILL RUN"
+        )
+
+    # ---------------------------------------------
+    # RSS
+    # ---------------------------------------------
+
+    sent = process_rss_news()
+
+    print(
+        "\n================================"
     )
 
     print(
         f"✅ اجرای ربات تمام شد. "
-        f"{news_sent} خبر + "
-        f"{live_sent} اتفاق زنده ارسال شد."
+        f"{sent} خبر جدید ارسال شد"
     )
 
     print(
@@ -2214,12 +1300,6 @@ async def main():
     )
 
 
-# ============================================================
-# START
-# ============================================================
-
 if __name__ == "__main__":
 
-    asyncio.run(
-        main()
-    )
+    main()
