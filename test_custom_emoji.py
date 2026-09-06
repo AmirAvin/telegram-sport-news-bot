@@ -10,32 +10,38 @@ CUSTOM_EMOJI_ID = "5791645007882495057"
 
 async def main():
     print("START TEST")
-    print("Connecting to Telegram...")
 
-    bot = Bot(token=BOT_TOKEN)
+    try:
+        bot = Bot(token=BOT_TOKEN)
 
-    me = await bot.get_me()
-    print("BOT OK")
-    print("Bot username:", me.username)
+        me = await bot.get_me()
+        print("BOT OK")
+        print("Bot username:", me.username)
 
-    text = (
-        f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">⚽️</tg-emoji> '
-        'تست ایموجی لیگ‌برتر @ligebartar24'
-    )
+        text = (
+            f'<tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">⚽️</tg-emoji> '
+            'تست ایموجی لیگ‌برتر @ligebartar24'
+        )
 
-    print("Sending message...")
+        print("SENDING MESSAGE...")
+        
+        message = await bot.send_message(
+            chat_id=CHANNEL_ID,
+            text=text,
+            parse_mode="HTML"
+        )
 
-    message = await bot.send_message(
-        chat_id=CHANNEL_ID,
-        text=text,
-        parse_mode="HTML"
-    )
+        print("MESSAGE SENT")
+        print("MESSAGE ID:", message.message_id)
 
-    print("MESSAGE SENT")
-    print("Message ID:", message.message_id)
+        await bot.close()
 
-    await bot.close()
-    print("TEST FINISHED")
+    except Exception as e:
+        print("===== ERROR DETAILS =====")
+        print(type(e).__name__)
+        print(str(e))
+        print("=========================")
+        raise
 
 
 if __name__ == "__main__":
