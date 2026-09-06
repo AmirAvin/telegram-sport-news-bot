@@ -8,23 +8,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install requests
         run: |
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Test Aparat API and MP4
+      - name: Test Aparat API
         run: |
-          python - <<'PY'
+          python -u - <<'PY'
           import requests
+          import json
+          import sys
 
           VIDEO_HASH = "mxh0449"
 
@@ -44,98 +43,116 @@ jobs:
               "User-Agent": "Mozilla/5.0"
           }
 
-          r = requests.get(
-              API_URL,
-              headers=headers,
-              timeout=30
-          )
+          try:
+              r = requests.get(
+                  API_URL,
+                  headers=headers,
+                  timeout=30
+              )
 
-          print("API STATUS:", r.status_code)
-          print("CONTENT TYPE:", r.headers.get("content-type"))
-          print()
+              print("API STATUS:", r.status_code)
+              print("CONTENT TYPE:", r.headers.get("content-type"))
+              print()
 
-          if r.status_code != 200:
-              print("❌ Aparat API failed")
-              print(r.text[:1000])
-              raise SystemExit(1)
+              print("RESPONSE PREVIEW:")
+              print(r.text[:3000])
+              print()
 
-          data = r.json()
+              if r.status_code != 200:
+                  print("❌ APARAT API FAILED")
+                  sys.exit(1)
 
-          attrs = data.get("data", {}).get("attributes", {})
+              try:
+                  data = r.json()
+              except Exception as e:
+                  print("❌ JSON ERROR:", repr(e))
+                  sys.exit(1)
 
-          print("TITLE:")
-          print(attrs.get("title"))
-          print()
+              print("JSON RECEIVED: YES")
+              print()
 
-          print("DURATION:")
-          print(attrs.get("duration"), "seconds")
-          print()
+              def find_mp4(obj, path="root"):
+                  if isinstance(obj, dict):
+                      for key, value in obj.items():
+                          current_path = f"{path}.{key}"
 
-          print("CONTENT TYPE:")
-          print(attrs.get("content_type"))
-          print()
+                          if isinstance(value, str):
+                              if ".mp4" in value.lower():
+                                  print("✅ MP4 FOUND AT:", current_path)
+                                  print("MP4 URL:", value)
+                                  return value
 
-          print("PROCESS:")
-          print(attrs.get("process"))
-          print()
+                          result = find_mp4(value, current_path)
 
-          file_links = attrs.get("file_link_all", [])
+                          if result:
+                              return result
 
-          print("MP4 PROFILES:", len(file_links))
-          print()
+                  elif isinstance(obj, list):
+                      for i, value in enumerate(obj):
+                          result = find_mp4(
+                              value,
+                              f"{path}[{i}]"
+                          )
 
-          mp4_url = None
+                          if result:
+                              return result
 
-          for item in file_links:
-              profile = item.get("profile")
-              urls = item.get("urls", [])
+                  return None
 
-              print("PROFILE:", profile)
-              print("URL COUNT:", len(urls))
+              mp4_url = find_mp4(data)
 
-              if urls:
-                  print("MP4 FOUND: YES")
+              print()
 
-                  if mp4_url is None:
-                      mp4_url = urls[0]
+              if not mp4_url:
+                  print("❌ NO MP4 URL FOUND")
+                  print()
+                  print("FULL JSON:")
+                  print(json.dumps(
+                      data,
+                      ensure_ascii=False,
+                      indent=2
+                  )[:10000])
+                  sys.exit(1)
 
-          print()
+              print("=" * 70)
+              print("TESTING MP4 CONNECTION")
+              print("=" * 70)
 
-          if not mp4_url:
-              print("❌ NO MP4 URL FOUND")
-              raise SystemExit(1)
+              video = requests.get(
+                  mp4_url,
+                  headers=headers,
+                  stream=True,
+                  timeout=30
+              )
 
-          print("=" * 70)
-          print("MP4 URL FOUND")
-          print("=" * 70)
+              print("MP4 STATUS:", video.status_code)
+              print(
+                  "MP4 CONTENT TYPE:",
+                  video.headers.get("content-type")
+              )
+              print(
+                  "MP4 CONTENT LENGTH:",
+                  video.headers.get("content-length")
+              )
 
-          print("Testing MP4 connection...")
+              if video.status_code != 200:
+                  print("❌ MP4 URL NOT ACCESSIBLE")
+                  sys.exit(1)
 
-          video = requests.get(
-              mp4_url,
-              headers=headers,
-              stream=True,
-              timeout=30
-          )
+              print()
+              print("=" * 70)
+              print("✅ APARAT VIDEO TEST SUCCESS")
+              print("✅ API WORKS")
+              print("✅ MP4 URL FOUND")
+              print("✅ MP4 URL ACCESSIBLE")
+              print("=" * 70)
 
-          print("MP4 STATUS:", video.status_code)
-          print("MP4 CONTENT TYPE:", video.headers.get("content-type"))
-          print("MP4 CONTENT LENGTH:", video.headers.get("content-length"))
-
-          if video.status_code != 200:
-              print("❌ MP4 URL cannot be accessed")
-              raise SystemExit(1)
-
-          content_type = video.headers.get("content-type", "")
-
-          if "video" not in content_type and "octet-stream" not in content_type:
-              print("⚠️ WARNING: unexpected content type")
-
-          print()
-          print("=" * 70)
-          print("✅ APARAT VIDEO TEST SUCCESS")
-          print("✅ API WORKS")
-          print("✅ MP4 URL FOUND")
-          print("✅ MP4 URL ACCESSIBLE")
-          print("=" * 70)
+          except Exception as e:
+              print()
+              print("=" * 70)
+              print("❌ UNEXPECTED ERROR")
+              print("=" * 70)
+              print(type(e).__name__)
+              print(repr(e))
+              sys.exit(1)
           PY
