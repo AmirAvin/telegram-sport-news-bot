@@ -27,4 +27,8 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHANNEL: ${{ secrets.CHANNEL_ID }}
-        run: python bot.py
+        run: |
+          echo "===== STARTING BOT ====="
+          python -u bot.py
+          echo "===== BOT FINISHED ====="
+`
