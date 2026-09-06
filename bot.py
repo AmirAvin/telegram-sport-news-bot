@@ -32,40 +32,18 @@ CUSTOM_EMOJI_ID = "5231262796364137694"
 RSS_SOURCES = [
 
     # 🇮🇷 ایران
-
-    # لیگ برتر ایران
     "https://www.khabarvarzeshi.com/rss/tp/63",
-
-    # لیگ یک ایران
     "https://www.khabarvarzeshi.com/rss/tp/110",
-
-    # بازیکنان ایرانی خارج از کشور
     "https://www.khabarvarzeshi.com/rss/tp/111",
-
-    # جام حذفی ایران
     "https://www.khabarvarzeshi.com/rss/tp/103",
 
     # 🌍 اروپا
-
-    # انگلیس
     "https://www.khabarvarzeshi.com/rss/tp/64",
-
-    # اسپانیا
     "https://www.khabarvarzeshi.com/rss/tp/65",
-
-    # آلمان
     "https://www.khabarvarzeshi.com/rss/tp/66",
-
-    # ایتالیا
     "https://www.khabarvarzeshi.com/rss/tp/67",
-
-    # فرانسه
     "https://www.khabarvarzeshi.com/rss/tp/68",
-
-    # لیگ قهرمانان
     "https://www.khabarvarzeshi.com/rss/tp/75",
-
-    # لیگ اروپا
     "https://www.khabarvarzeshi.com/rss/tp/76",
 
     # Sarpoosh
@@ -83,8 +61,6 @@ RSS_SOURCES = [
 # =========================================================
 
 FOOTBALL_KEYWORDS = [
-
-    # 🇮🇷 ایران
 
     "استقلال",
     "پرسپولیس",
@@ -108,7 +84,6 @@ FOOTBALL_KEYWORDS = [
     "پیکان",
     "فجر سپاسی",
 
-    # تیم ملی
     "تیم ملی",
     "تیم‌ملی",
     "فوتبال ایران",
@@ -119,21 +94,18 @@ FOOTBALL_KEYWORDS = [
     "قلعه نویی",
     "قلعه‌نویی",
 
-    # مسابقات داخلی
     "لیگ برتر",
     "لیگ برتر ایران",
     "لیگ یک",
     "جام حذفی",
     "آزادگان",
 
-    # نقل و انتقالات
     "نقل و انتقالات",
     "نقل‌وانتقالات",
     "انتقالات",
     "قرارداد",
     "تمدید قرارداد",
 
-    # مسابقات
     "فوتبال",
     "گل",
     "گلزنی",
@@ -148,8 +120,6 @@ FOOTBALL_KEYWORDS = [
     "تعویض",
     "var",
     "وی ای آر",
-
-    # 🌍 اروپا
 
     "رئال مادرید",
     "بارسلونا",
@@ -169,7 +139,6 @@ FOOTBALL_KEYWORDS = [
     "پاری سن ژرمن",
     "پاری‌سن‌ژرمن",
 
-    # لیگ‌های اروپایی
     "لیگ قهرمانان اروپا",
     "لیگ اروپا",
     "لیگ انگلیس",
@@ -179,7 +148,6 @@ FOOTBALL_KEYWORDS = [
     "بوندسلیگا",
     "لیگ فرانسه",
 
-    # ستاره‌ها
     "رونالدو",
     "مسی",
     "امباپه",
@@ -251,12 +219,136 @@ def normalize_title(text):
 
 
 # =========================================================
+# HASHTAGS
+# =========================================================
+
+HASHTAG_MAP = {
+
+    "استقلال": "#استقلال",
+    "پرسپولیس": "#پرسپولیس",
+    "سپاهان": "#سپاهان",
+    "تراکتور": "#تراکتور",
+    "ذوب آهن": "#ذوب_آهن",
+    "ذوب‌آهن": "#ذوب_آهن",
+    "گل گهر": "#گل_گهر",
+    "گل‌گهر": "#گل_گهر",
+    "فولاد": "#فولاد",
+    "نساجی": "#نساجی",
+    "ملوان": "#ملوان",
+    "آلومینیوم": "#آلومینیوم",
+    "هوادار": "#هوادار",
+    "شمس آذر": "#شمس_آذر",
+    "خیبر": "#خیبر",
+    "چادرملو": "#چادرملو",
+    "استقلال خوزستان": "#استقلال_خوزستان",
+    "مس رفسنجان": "#مس_رفسنجان",
+    "مس کرمان": "#مس_کرمان",
+    "پیکان": "#پیکان",
+    "فجر سپاسی": "#فجر_سپاسی",
+
+    "تیم ملی": "#تیم_ملی",
+    "فوتبال ایران": "#فوتبال_ایران",
+    "لیگ برتر": "#لیگ_برتر",
+    "لیگ یک": "#لیگ_یک",
+    "جام حذفی": "#جام_حذفی",
+    "آزادگان": "#آزادگان",
+
+    "رئال مادرید": "#رئال_مادرید",
+    "بارسلونا": "#بارسلونا",
+    "اتلتیکو مادرید": "#اتلتیکو_مادرید",
+    "منچستریونایتد": "#منچستریونایتد",
+    "منچستر سیتی": "#منچستر_سیتی",
+    "لیورپول": "#لیورپول",
+    "آرسنال": "#آرسنال",
+    "چلسی": "#چلسی",
+    "تاتنهام": "#تاتنهام",
+    "بایرن مونیخ": "#بایرن_مونیخ",
+    "دورتموند": "#دورتموند",
+    "اینتر": "#اینتر",
+    "میلان": "#میلان",
+    "یوونتوس": "#یوونتوس",
+    "ناپولی": "#ناپولی",
+    "پاری سن ژرمن": "#پاری_سن_ژرمن",
+    "پاری‌سن‌ژرمن": "#پاری_سن_ژرمن",
+
+    "لیگ قهرمانان اروپا": "#لیگ_قهرمانان_اروپا",
+    "لیگ اروپا": "#لیگ_اروپا",
+    "لیگ انگلیس": "#لیگ_انگلیس",
+    "پریمیرلیگ": "#پریمیرلیگ",
+    "لالیگا": "#لالیگا",
+    "سری آ": "#سری_آ",
+    "بوندسلیگا": "#بوندسلیگا",
+    "لیگ فرانسه": "#لیگ_فرانسه",
+
+    "رونالدو": "#رونالدو",
+    "مسی": "#مسی",
+    "امباپه": "#امباپه",
+    "هالند": "#هالند",
+    "نیمار": "#نیمار",
+    "صلاح": "#صلاح",
+    "بلینگام": "#بلینگام",
+    "وینیسیوس": "#وینیسیوس",
+
+    "نقل و انتقالات": "#نقل_و_انتقالات",
+    "نقل‌وانتقالات": "#نقل_و_انتقالات",
+    "قرارداد": "#قرارداد",
+    "تمدید قرارداد": "#تمدید_قرارداد",
+
+    "دربی": "#دربی",
+    "داربی": "#دربی",
+    "گلزنی": "#گلزنی",
+    "ترکیب": "#ترکیب",
+    "داور": "#داور",
+}
+
+
+def create_hashtags(title):
+
+    text = normalize_title(title)
+
+    hashtags = []
+
+    sorted_items = sorted(
+        HASHTAG_MAP.items(),
+        key=lambda x: len(
+            normalize_title(x[0])
+        ),
+        reverse=True
+    )
+
+    for keyword, hashtag in sorted_items:
+
+        keyword_normalized = normalize_title(
+            keyword
+        )
+
+        if keyword_normalized in text:
+
+            if hashtag not in hashtags:
+
+                hashtags.append(
+                    hashtag
+                )
+
+    if "#فوتبال" not in hashtags:
+
+        hashtags.append(
+            "#فوتبال"
+        )
+
+    return " ".join(
+        hashtags[:5]
+    )
+
+
+# =========================================================
 # SENT DATABASE
 # =========================================================
 
 def load_sent_news():
 
     if not os.path.exists(SENT_FILE):
+
         return []
 
     try:
@@ -270,6 +362,7 @@ def load_sent_news():
             data = json.load(f)
 
             if isinstance(data, list):
+
                 return data
 
     except Exception as e:
@@ -329,9 +422,11 @@ def is_duplicate_news(
     for item in sent_news:
 
         if item == link:
+
             return True
 
         if item == title_key:
+
             return True
 
         if isinstance(item, dict):
@@ -347,6 +442,7 @@ def is_duplicate_news(
             )
 
             if old_link == link:
+
                 return True
 
             if old_title:
@@ -372,7 +468,9 @@ def register_sent_news(
 
     if link and link not in sent_news:
 
-        sent_news.append(link)
+        sent_news.append(
+            link
+        )
 
     title_key = (
         "title:" +
@@ -381,7 +479,9 @@ def register_sent_news(
 
     if title_key not in sent_news:
 
-        sent_news.append(title_key)
+        sent_news.append(
+            title_key
+        )
 
     save_sent_news(
         sent_news
@@ -401,10 +501,6 @@ def is_football_news(
         f"{title} {summary}"
     )
 
-    # -----------------------------------------
-    # خبرهای غیر فوتبالی
-    # -----------------------------------------
-
     for bad in NON_FOOTBALL_KEYWORDS:
 
         bad_normalized = normalize_title(
@@ -421,10 +517,6 @@ def is_football_news(
             ):
 
                 return False
-
-    # -----------------------------------------
-    # ایران
-    # -----------------------------------------
 
     iran_words = [
 
@@ -458,19 +550,11 @@ def is_football_news(
 
             return True
 
-    # -----------------------------------------
-    # فوتبال اروپا
-    # -----------------------------------------
-
     for word in FOOTBALL_KEYWORDS:
 
         if normalize_title(word) in text:
 
             return True
-
-    # -----------------------------------------
-    # فوتبال عمومی
-    # -----------------------------------------
 
     if "فوتبال" in text:
 
@@ -555,7 +639,6 @@ def get_news():
                     title
                 )
 
-                # تکراری داخل همین اجرا
                 if link in seen_urls:
 
                     continue
@@ -564,7 +647,6 @@ def get_news():
 
                     continue
 
-                # فقط فوتبال
                 if not is_football_news(
                     title,
                     summary
@@ -577,7 +659,10 @@ def get_news():
 
                     continue
 
-                seen_urls.add(link)
+                seen_urls.add(
+                    link
+                )
+
                 seen_titles.add(
                     normalized
                 )
@@ -585,13 +670,9 @@ def get_news():
                 all_news.append({
 
                     "title": title,
-
                     "link": link,
-
                     "summary": summary,
-
                     "source": rss_url,
-
                     "entry": entry,
 
                 })
@@ -921,6 +1002,19 @@ def send_news(
     )
 
     # =====================================================
+    # HASHTAGS
+    # =====================================================
+
+    hashtags = create_hashtags(
+        title
+    )
+
+    print(
+        "HASHTAGS:",
+        hashtags
+    )
+
+    # =====================================================
     # APARAT VIDEO
     # =====================================================
 
@@ -998,11 +1092,11 @@ def send_news(
                     "✅ VIDEO DOWNLOADED"
                 )
 
-                # بدون لینک خبر
                 caption = (
                     f"⚽️ <b>"
                     f"{html.escape(title)}"
                     f"</b>\n\n"
+                    f"{hashtags}\n\n"
                     f"@ligebartar24"
                 )
 
@@ -1053,11 +1147,11 @@ def send_news(
         entry
     )
 
-    # بدون لینک خبر
     caption = (
         f"⚽️ <b>"
         f"{html.escape(title)}"
         f"</b>\n\n"
+        f"{hashtags}\n\n"
         f"@ligebartar24"
     )
 
@@ -1139,10 +1233,6 @@ def process_rss_news():
 
         title = news["title"]
         link = news["link"]
-
-        # ---------------------------------------------
-        # DUPLICATE
-        # ---------------------------------------------
 
         if is_duplicate_news(
             title,
@@ -1325,7 +1415,6 @@ def main():
             "➡️ RSS NEWS WILL STILL RUN"
         )
 
-    # RSS
     sent = process_rss_news()
 
     print(
@@ -1342,6 +1431,4 @@ def main():
     )
 
 
-if __name__ == "__main__":
-
-    main()
+if __name__ ==
