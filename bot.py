@@ -24,8 +24,6 @@ API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY")
 SENT_FILE = "sent_news.json"
 LAST_RUN_FILE = "last_run.json"
 
-CUSTOM_EMOJI_ID = "5231262796364137694"
-
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 Chrome/120 Safari/537.36"
@@ -153,6 +151,18 @@ FOOTBALL_KEYWORDS = [
     "میلان",
     "پاری سن ژرمن",
     "پاری‌سن‌ژرمن",
+    "ناپولی",
+    "رم",
+    "لاتزیو",
+
+    "مسی",
+    "رونالدو",
+    "امباپه",
+    "هالند",
+    "نیمار",
+    "صلاح",
+    "وینیسیوس",
+    "بلینگام",
 
     "آسیا",
     "اروپا",
@@ -161,6 +171,10 @@ FOOTBALL_KEYWORDS = [
     "عربستان",
 ]
 
+
+# ============================================================
+# NON FOOTBALL
+# ============================================================
 
 NON_FOOTBALL_KEYWORDS = [
     "والیبال",
@@ -175,12 +189,11 @@ NON_FOOTBALL_KEYWORDS = [
 
 
 # ============================================================
-# SMART HASHTAGS
+# HASHTAG MAP
 # ============================================================
 
 HASHTAG_MAP = {
 
-    # ایران
     "استقلال": "#استقلال",
     "پرسپولیس": "#پرسپولیس",
     "سپاهان": "#سپاهان",
@@ -202,7 +215,6 @@ HASHTAG_MAP = {
     "پیکان": "#پیکان",
     "سایپا": "#سایپا",
 
-    # مسابقات
     "لیگ برتر": "#لیگ_برتر",
     "لیگ یک": "#لیگ_یک",
     "لیگ آزادگان": "#لیگ_آزادگان",
@@ -213,12 +225,10 @@ HASHTAG_MAP = {
     "لیگ کنفرانس": "#لیگ_کنفرانس",
     "سوپر جام": "#سوپرجام",
 
-    # تیم ملی
     "تیم ملی": "#تیم_ملی",
     "تیم‌ملی": "#تیم_ملی",
     "ایران": "#ایران",
 
-    # بازیکنان
     "مهدی طارمی": "#طارمی",
     "طارمی": "#طارمی",
     "سردار آزمون": "#آزمون",
@@ -237,16 +247,12 @@ HASHTAG_MAP = {
     "سهراب بختیاری‌زاده": "#بختیاری‌زاده",
     "قلعه نویی": "#قلعه‌نویی",
     "قلعه‌نویی": "#قلعه‌نویی",
-    "مجتبی جباری": "#جباری",
     "جباری": "#جباری",
-    "محرم نویدکیا": "#نویدکیا",
     "نویدکیا": "#نویدکیا",
-    "مهدی تارتار": "#تارتار",
     "تارتار": "#تارتار",
     "علی دایی": "#علی_دایی",
     "کریم باقری": "#کریم_باقری",
 
-    # تیم‌های خارجی
     "رئال مادرید": "#رئال_مادرید",
     "بارسلونا": "#بارسلونا",
     "اتلتیکو مادرید": "#اتلتیکو_مادرید",
@@ -270,10 +276,7 @@ HASHTAG_MAP = {
     "ناپولی": "#ناپولی",
     "رم": "#رم",
     "لاتزیو": "#لاتزیو",
-    "لیون": "#لیون",
-    "استون ویلا": "#استون_ویلا",
 
-    # ستاره‌های خارجی
     "لیونل مسی": "#مسی",
     "مسی": "#مسی",
     "کریستیانو رونالدو": "#رونالدو",
@@ -285,54 +288,8 @@ HASHTAG_MAP = {
     "وینیسیوس": "#وینیسیوس",
     "بلینگام": "#بلینگام",
 
-    # عمومی
     "فوتبال": "#فوتبال",
 }
-
-
-def create_hashtags(title, summary=""):
-
-    # عنوان + متن خلاصه خبر
-    full_text = f"{title} {summary}"
-
-    normalized = normalize_title(
-        full_text
-    )
-
-    found = []
-
-    # عبارت‌های طولانی‌تر اول بررسی شوند
-    sorted_keys = sorted(
-        HASHTAG_MAP.keys(),
-        key=lambda x: len(
-            normalize_title(x)
-        ),
-        reverse=True
-    )
-
-    for key in sorted_keys:
-
-        key_normalized = normalize_title(
-            key
-        )
-
-        if key_normalized in normalized:
-
-            tag = HASHTAG_MAP[key]
-
-            if tag not in found:
-                found.append(tag)
-
-        if len(found) >= 4:
-            break
-
-    # فوتبال همیشه باشد
-    if "#فوتبال" not in found:
-        found.append("#فوتبال")
-
-    return " ".join(
-        found[:5]
-    )
 
 
 # ============================================================
@@ -373,6 +330,57 @@ def normalize_title(text):
 
 
 # ============================================================
+# SMART HASHTAGS
+# ============================================================
+
+def create_hashtags(
+    title,
+    article_text=""
+):
+
+    full_text = (
+        f"{title} {article_text}"
+    )
+
+    normalized = normalize_title(
+        full_text
+    )
+
+    found = []
+
+    sorted_keys = sorted(
+        HASHTAG_MAP.keys(),
+        key=lambda x: len(
+            normalize_title(x)
+        ),
+        reverse=True
+    )
+
+    for key in sorted_keys:
+
+        key_normalized = normalize_title(
+            key
+        )
+
+        if key_normalized in normalized:
+
+            tag = HASHTAG_MAP[key]
+
+            if tag not in found:
+                found.append(tag)
+
+        if len(found) >= 4:
+            break
+
+    if "#فوتبال" not in found:
+        found.append("#فوتبال")
+
+    return " ".join(
+        found[:5]
+    )
+
+
+# ============================================================
 # SENT DATABASE
 # ============================================================
 
@@ -397,17 +405,13 @@ def load_sent_news():
             data,
             list
         ):
-
             return set(data)
 
         if isinstance(
             data,
             dict
         ):
-
-            return set(
-                data.keys()
-            )
+            return set(data.keys())
 
     except Exception as e:
 
@@ -449,13 +453,9 @@ def register_sent(
     sent
 ):
 
-    sent.add(
-        link
-    )
+    sent.add(link)
 
-    save_sent_news(
-        sent
-    )
+    save_sent_news(sent)
 
 
 # ============================================================
@@ -683,6 +683,206 @@ def get_news_timestamp(news):
 
 
 # ============================================================
+# REAL ARTICLE TEXT
+# ============================================================
+
+def get_article_text(url):
+
+    print(
+        "📄 GETTING ARTICLE TEXT:",
+        url
+    )
+
+    try:
+
+        response = requests.get(
+            url,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept-Language":
+                    "fa-IR,fa;q=0.9,en;q=0.8",
+            },
+            timeout=30
+        )
+
+        print(
+            "ARTICLE STATUS:",
+            response.status_code
+        )
+
+        if response.status_code != 200:
+            return ""
+
+        soup = BeautifulSoup(
+            response.content,
+            "html.parser"
+        )
+
+        # حذف عناصر غیرخبری
+        for tag in soup([
+            "script",
+            "style",
+            "noscript",
+            "header",
+            "footer",
+            "nav",
+            "form",
+            "aside"
+        ]):
+
+            tag.decompose()
+
+        selectors = [
+            "article",
+            "[class*='article-content']",
+            "[class*='article_content']",
+            "[class*='news-content']",
+            "[class*='news_content']",
+            "[class*='post-content']",
+            "[class*='post_content']",
+            "[class*='content-detail']",
+            "[class*='content_detail']",
+            "[class*='news-text']",
+            "[class*='news_text']",
+            "[class*='article-body']",
+            "[class*='article_body']",
+            "main"
+        ]
+
+        container = None
+
+        for selector in selectors:
+
+            try:
+
+                element = soup.select_one(
+                    selector
+                )
+
+                if element:
+
+                    paragraphs = element.find_all(
+                        "p"
+                    )
+
+                    if len(paragraphs) >= 2:
+
+                        container = element
+                        break
+
+            except Exception:
+                continue
+
+        if container:
+
+            paragraphs = container.find_all(
+                "p"
+            )
+
+        else:
+
+            paragraphs = soup.find_all(
+                "p"
+            )
+
+        texts = []
+
+        for p in paragraphs:
+
+            text = p.get_text(
+                " ",
+                strip=True
+            )
+
+            text = re.sub(
+                r"\s+",
+                " ",
+                text
+            ).strip()
+
+            if not text:
+                continue
+
+            if len(text) < 25:
+                continue
+
+            bad_phrases = [
+                "عضویت در کانال",
+                "اخبار مرتبط",
+                "مطالب مرتبط",
+                "تبلیغات",
+                "کد خبر",
+                "منبع:",
+                "منبع خبر",
+                "ارسال دیدگاه",
+                "دیدگاه"
+            ]
+
+            if any(
+                phrase in text
+                for phrase in bad_phrases
+            ):
+                continue
+
+            texts.append(text)
+
+        if not texts:
+
+            print(
+                "⚠️ ARTICLE TEXT NOT FOUND"
+            )
+
+            return ""
+
+        unique_texts = []
+        seen = set()
+
+        for text in texts:
+
+            normalized = normalize_title(
+                text
+            )
+
+            if normalized in seen:
+                continue
+
+            seen.add(
+                normalized
+            )
+
+            unique_texts.append(
+                text
+            )
+
+        article_text = "\n\n".join(
+            unique_texts
+        )
+
+        article_text = re.sub(
+            r"\n{3,}",
+            "\n\n",
+            article_text
+        ).strip()
+
+        print(
+            "✅ ARTICLE TEXT FOUND:",
+            len(article_text),
+            "characters"
+        )
+
+        return article_text
+
+    except Exception as e:
+
+        print(
+            "ARTICLE TEXT ERROR:",
+            repr(e)
+        )
+
+        return ""
+
+
+# ============================================================
 # APARAT HASH
 # ============================================================
 
@@ -811,8 +1011,10 @@ def get_aparat_video(
 
     headers = {
         "User-Agent": USER_AGENT,
-        "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.8",
-        "Referer": "https://www.aparat.com/",
+        "Accept-Language":
+            "fa-IR,fa;q=0.9,en;q=0.8",
+        "Referer":
+            "https://www.aparat.com/",
     }
 
     try:
@@ -1047,7 +1249,6 @@ def get_aparat_video(
 
             return None
 
-        # حذف URLهای تکراری
         unique = []
         seen = set()
 
@@ -1066,7 +1267,6 @@ def get_aparat_video(
 
         mp4_list = unique
 
-        # کیفیت ترجیحی
         for quality in [
             "360p",
             "240p",
@@ -1175,7 +1375,6 @@ def get_entry_image(news):
                 if url:
                     return url
 
-        # استخراج عکس از خلاصه RSS
         summary = news.get(
             "summary",
             ""
@@ -1235,13 +1434,46 @@ def send_news(
         title
     )
 
-    # هشتگ از عنوان + متن خبر
+    # --------------------------------------------------------
+    # متن واقعی خبر
+    # --------------------------------------------------------
+
+    article_text = get_article_text(
+        link
+    )
+
+    # اگر متن واقعی پیدا نشد
+    if not article_text:
+
+        article_text = BeautifulSoup(
+            news.get(
+                "summary",
+                ""
+            ),
+            "html.parser"
+        ).get_text(
+            " ",
+            strip=True
+        )
+
+        article_text = re.sub(
+            r"\s+",
+            " ",
+            article_text
+        ).strip()
+
+    print(
+        "ARTICLE TEXT LENGTH:",
+        len(article_text)
+    )
+
+    # --------------------------------------------------------
+    # هشتگ‌ها از تیتر + متن واقعی
+    # --------------------------------------------------------
+
     hashtags = create_hashtags(
         title,
-        news.get(
-            "summary",
-            ""
-        )
+        article_text
     )
 
     print(
@@ -1249,8 +1481,43 @@ def send_news(
         hashtags
     )
 
+    safe_title = html.escape(
+        title
+    )
+
+    # --------------------------------------------------------
+    # متن کوتاه برای عکس و ویدئو
+    # --------------------------------------------------------
+
+    media_text = article_text[:650]
+
+    if len(article_text) > 650:
+        media_text += "..."
+
+    media_text = html.escape(
+        media_text
+    )
+
+    # --------------------------------------------------------
+    # متن کامل‌تر برای پیام متنی
+    # --------------------------------------------------------
+
+    text_message = article_text[:3000]
+
+    if len(article_text) > 3000:
+        text_message += "..."
+
+    text_message = html.escape(
+        text_message
+    )
+
+    # --------------------------------------------------------
+    # CAPTION
+    # --------------------------------------------------------
+
     caption = (
-        f"{html.escape(title)}\n\n"
+        f"<b>{safe_title}</b>\n\n"
+        f"{media_text}\n\n"
         f"{hashtags}\n\n"
         f"@ligebartar24"
     )
@@ -1277,9 +1544,12 @@ def send_news(
             media_response = requests.get(
                 video_url,
                 headers={
-                    "User-Agent": USER_AGENT,
-                    "Referer": "https://www.aparat.com/",
-                    "Origin": "https://www.aparat.com"
+                    "User-Agent":
+                        USER_AGENT,
+                    "Referer":
+                        "https://www.aparat.com/",
+                    "Origin":
+                        "https://www.aparat.com"
                 },
                 stream=True,
                 timeout=120
@@ -1362,9 +1632,11 @@ def send_news(
             ):
 
                 try:
+
                     os.remove(
                         temp_file
                     )
+
                 except Exception:
                     pass
 
@@ -1390,7 +1662,8 @@ def send_news(
             image_response = requests.get(
                 image_url,
                 headers={
-                    "User-Agent": USER_AGENT
+                    "User-Agent":
+                        USER_AGENT
                 },
                 timeout=30
             )
@@ -1450,9 +1723,11 @@ def send_news(
             ):
 
                 try:
+
                     os.remove(
                         temp_image
                     )
+
                 except Exception:
                     pass
 
@@ -1462,10 +1737,19 @@ def send_news(
 
     try:
 
+        text_caption = (
+            f"<b>{safe_title}</b>\n\n"
+            f"{text_message}\n\n"
+            f"{hashtags}\n\n"
+            f"@ligebartar24"
+        )
+
+        text_caption = text_caption[:4090]
+
         asyncio.get_event_loop().run_until_complete(
             bot.send_message(
                 chat_id=CHANNEL,
-                text=caption,
+                text=text_caption,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
@@ -1518,7 +1802,6 @@ def process_rss_news(
 
     last_run = load_last_run()
 
-    # اولین اجرا بعد از نصب نسخه جدید
     if last_run is None:
 
         print()
@@ -1599,7 +1882,10 @@ def process_rss_news(
                 news
             )
 
-    # حذف خبرهای تکراری بین RSSها
+    # --------------------------------------------------------
+    # حذف تکراری‌های RSS
+    # --------------------------------------------------------
+
     unique_news = []
     seen_links = set()
 
@@ -1620,7 +1906,10 @@ def process_rss_news(
 
     all_new_news = unique_news
 
-    # مرتب‌سازی از قدیمی‌تر به جدیدتر
+    # --------------------------------------------------------
+    # مرتب‌سازی
+    # --------------------------------------------------------
+
     all_new_news.sort(
         key=lambda item: (
             get_news_timestamp(
