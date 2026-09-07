@@ -764,62 +764,148 @@ def get_aparat_video(url):
 
     try:
 
+        print(
+            "\n🎥 CHECKING APARAT VIDEO:",
+            url
+        )
+
         response = requests.get(
             url,
-            timeout=20,
+            timeout=30,
             headers={
                 "User-Agent":
                 "Mozilla/5.0"
             }
         )
 
+        print(
+            "APARAT PAGE STATUS:",
+            response.status_code
+        )
+
         if response.status_code != 200:
 
             return None
 
-        soup = BeautifulSoup(
-            response.text,
-            "html.parser"
-        )
+        page_html = response.text
 
-        iframe = soup.find(
-            "iframe",
-            src=re.compile(
-                r"aparat\.com"
+        # =====================================================
+        # پیدا کردن VIDEO HASH
+        # =====================================================
+
+        video_hash = None
+
+        # -----------------------------------------------------
+        # روش اول: videohash در HTML
+        # -----------------------------------------------------
+
+        patterns = [
+
+            r"videohash[\"'\s:/]+([A-Za-z0-9_-]+)",
+
+            r"videohash/([A-Za-z0-9_-]+)",
+
+            r"/v/([A-Za-z0-9_-]+)",
+
+            r"aparat\.com/v/([A-Za-z0-9_-]+)",
+
+            r'"uid"\s*:\s*"([A-Za-z0-9_-]+)"',
+
+        ]
+
+        for pattern in patterns:
+
+            match = re.search(
+                pattern,
+                page_html,
+                re.IGNORECASE
             )
-        )
 
-        if not iframe:
+            if match:
+
+                video_hash = match.group(
+                    1
+                )
+
+                print(
+                    "✅ VIDEO HASH FOUND FROM HTML:",
+                    video_hash
+                )
+
+                break
+
+        # -----------------------------------------------------
+        # روش دوم: iframe
+        # -----------------------------------------------------
+
+        if not video_hash:
+
+            soup = BeautifulSoup(
+                page_html,
+                "html.parser"
+            )
+
+            iframes = soup.find_all(
+                "iframe"
+            )
+
+            for iframe in iframes:
+
+                iframe_url = iframe.get(
+                    "src",
+                    ""
+                )
+
+                if not iframe_url:
+
+                    continue
+
+                if (
+                    "aparat.com"
+                    not in iframe_url.lower()
+                ):
+
+                    continue
+
+                print(
+                    "APARAT IFRAME:",
+                    iframe_url
+                )
+
+                match = re.search(
+                    r"(?:videohash/|/v/)([A-Za-z0-9_-]+)",
+                    iframe_url,
+                    re.IGNORECASE
+                )
+
+                if match:
+
+                    video_hash = match.group(
+                        1
+                    )
+
+                    print(
+                        "✅ VIDEO HASH FOUND FROM IFRAME:",
+                        video_hash
+                    )
+
+                    break
+
+        # -----------------------------------------------------
+        # اگر Video Hash پیدا نشد
+        # -----------------------------------------------------
+
+        if not video_hash:
+
+            print(
+                "❌ APARAT VIDEO HASH NOT FOUND"
+            )
 
             return None
 
-        iframe_url = iframe.get(
-            "src",
-            ""
-        )
-
-        print(
-            "APARAT IFRAME:",
-            iframe_url
-        )
-
-        match = re.search(
-            r"/videohash/([^/]+)",
-            iframe_url
-        )
-
-        if not match:
-
-            return None
-
-        video_hash = match.group(
-            1
-        )
-
-        print(
-            "APARAT VIDEO HASH FOUND:",
-            video_hash
-        )
+        # =====================================================
+        # APARAT API
+        # =====================================================
 
         api_url = (
             "https://www.aparat.com/"
@@ -827,9 +913,14 @@ def get_aparat_video(url):
             f"videohash/{video_hash}"
         )
 
+        print(
+            "APARAT API URL:",
+            api_url
+        )
+
         api_response = requests.get(
             api_url,
-            timeout=20,
+            timeout=30,
             headers={
                 "User-Agent":
                 "Mozilla/5.0"
@@ -843,73 +934,472 @@ def get_aparat_video(url):
 
         if api_response.status_code != 200:
 
+            print(
+                "❌ APARAT API ERROR"
+            )
+
+            print(
+                api_response.text[:500]
+            )
+
             return None
+
+        # =====================================================
+        # JSON
+        # =====================================================
 
         data = api_response.json()
 
-        def find_mp4(obj):
+        video_data = data.get(
+            "data",
+            {}
+        )
 
-            if isinstance(
-                obj,
-                dict
-            ):
+        attributes = video_data.get(
+            "attributes",
+            {}
+        )
 
-                for value in obj.values():
+        print(
+            "VIDEO TITLE:",
+            attributes.get(
+                "title",
+                ""
+            )
+        )
 
-                    if isinstance(
-                        value,
-                        str
-                    ):
+        print(
+            "VIDEO DURATION:",
+            attributes.get(
+                "duration",
+                ""
+            )
+        )
 
-                        if ".mp4" in value:
+        print(
+            "VIDEO PROCESS:",
+            attributes.get(
+                "process",
+                ""
+            )
+        )
 
-                            return value
+        print(
+            "VIDEO CONTENT TYPE:",
+            attributes.get(
+                "content_type",
+                ""
+            )
+        )
 
-                    result = find_mp4(
-                        value
-                    )
+        print(
+            "VIDEO CAN DOWNLOAD:",
+            attributes.get(
+                "can_download",
+                ""
+            )
+        )
 
-                    if result:
+        # =====================================================
+        # FILE LINK ALL
+        # =====================================================
 
-                        return result
+        file_link_all = attributes.get(
+            "file_link_all",
+            []
+        )
 
-            elif isinstance(
-                obj,
-                list
-            ):
+        print(
+            "========================================"
+        )
 
-                for value in obj:
+        print(
+            "FILE_LINK_ALL:"
+        )
 
-                    result = find_mp4(
-                        value
-                    )
+        print(
+            file_link_all
+        )
 
-                    if result:
+        print(
+            "========================================"
+        )
 
-                        return result
+        if not file_link_all:
+
+            print(
+                "❌ FILE_LINK_ALL EMPTY"
+            )
 
             return None
 
-        mp4 = find_mp4(
-            data
-        )
+        # =====================================================
+        # استخراج همه URL ها
+        # =====================================================
 
-        if mp4:
+        all_video_urls = []
 
-            print(
-                "APARAT MP4 FOUND"
+        for item in file_link_all:
+
+            if not isinstance(
+                item,
+                dict
+            ):
+
+                continue
+
+            profile = item.get(
+                "profile",
+                ""
             )
 
-            return mp4
+            urls = item.get(
+                "urls",
+                []
+            )
+
+            print(
+                "----------------------------------------"
+            )
+
+            print(
+                "PROFILE:",
+                profile
+            )
+
+            print(
+                "URLS:",
+                urls
+            )
+
+            # =================================================
+            # urls ممکن است list باشد
+            # =================================================
+
+            if isinstance(
+                urls,
+                list
+            ):
+
+                for video_url in urls:
+
+                    if not video_url:
+
+                        continue
+
+                    video_url = str(
+                        video_url
+                    ).strip()
+
+                    if (
+                        ".mp4"
+                        in video_url.lower()
+                    ):
+
+                        all_video_urls.append({
+
+                            "profile":
+                            str(profile),
+
+                            "url":
+                            video_url
+
+                        })
+
+                        print(
+                            "✅ MP4 FOUND:",
+                            profile
+                        )
+
+            # =================================================
+            # اگر urls به صورت string بود
+            # =================================================
+
+            elif isinstance(
+                urls,
+                str
+            ):
+
+                video_url = urls.strip()
+
+                if (
+                    ".mp4"
+                    in video_url.lower()
+                ):
+
+                    all_video_urls.append({
+
+                        "profile":
+                        str(profile),
+
+                        "url":
+                        video_url
+
+                    })
+
+                    print(
+                        "✅ MP4 FOUND:",
+                        profile
+                    )
+
+        # =====================================================
+        # اگر در ساختار معمول پیدا نشد
+        # JSON را عمیق‌تر بررسی می‌کنیم
+        # =====================================================
+
+        if not all_video_urls:
+
+            print(
+                "⚠️ NORMAL FILE_LINK_ALL SEARCH FAILED"
+            )
+
+            print(
+                "🔎 DEEP SEARCH FOR MP4..."
+            )
+
+            def deep_find_mp4(
+                obj,
+                profile=""
+            ):
+
+                results = []
+
+                if isinstance(
+                    obj,
+                    dict
+                ):
+
+                    current_profile = obj.get(
+                        "profile",
+                        profile
+                    )
+
+                    for key, value in obj.items():
+
+                        if isinstance(
+                            value,
+                            str
+                        ):
+
+                            if (
+                                ".mp4"
+                                in value.lower()
+                            ):
+
+                                results.append({
+
+                                    "profile":
+                                    str(current_profile),
+
+                                    "url":
+                                    value
+
+                                })
+
+                        elif isinstance(
+                            value,
+                            (dict, list)
+                        ):
+
+                            results.extend(
+                                deep_find_mp4(
+                                    value,
+                                    current_profile
+                                )
+                            )
+
+                elif isinstance(
+                    obj,
+                    list
+                ):
+
+                    for value in obj:
+
+                        results.extend(
+                            deep_find_mp4(
+                                value,
+                                profile
+                            )
+                        )
+
+                return results
+
+            deep_results = deep_find_mp4(
+                file_link_all
+            )
+
+            all_video_urls.extend(
+                deep_results
+            )
+
+        # =====================================================
+        # حذف URLهای تکراری
+        # =====================================================
+
+        unique_videos = []
+
+        seen_video_urls = set()
+
+        for video in all_video_urls:
+
+            video_url = video.get(
+                "url",
+                ""
+            )
+
+            if not video_url:
+
+                continue
+
+            if video_url in seen_video_urls:
+
+                continue
+
+            seen_video_urls.add(
+                video_url
+            )
+
+            unique_videos.append(
+                video
+            )
+
+        all_video_urls = unique_videos
+
+        # =====================================================
+        # نمایش همه MP4های پیدا شده
+        # =====================================================
+
+        print(
+            "========================================"
+        )
+
+        print(
+            "🎬 ALL MP4 VIDEOS FOUND:",
+            len(all_video_urls)
+        )
+
+        for index, video in enumerate(
+            all_video_urls,
+            start=1
+        ):
+
+            print(
+                f"MP4 #{index}:",
+                video["profile"],
+                video["url"]
+            )
+
+        print(
+            "========================================"
+        )
+
+        # =====================================================
+        # هیچ MP4 پیدا نشد
+        # =====================================================
+
+        if not all_video_urls:
+
+            print(
+                "❌ NO MP4 URL FOUND"
+            )
+
+            return None
+
+        # =====================================================
+        # انتخاب کیفیت
+        #
+        # اول 360p
+        # بعد 240p
+        # بعد 144p
+        # بعد اولین MP4
+        # =====================================================
+
+        preferred_profiles = [
+
+            "360p",
+            "240p",
+            "144p",
+
+        ]
+
+        selected_video = None
+
+        for preferred in preferred_profiles:
+
+            for video in all_video_urls:
+
+                profile = str(
+                    video.get(
+                        "profile",
+                        ""
+                    )
+                ).lower()
+
+                if profile == preferred.lower():
+
+                    selected_video = video
+
+                    break
+
+            if selected_video:
+
+                break
+
+        # =====================================================
+        # اگر کیفیت مشخص پیدا نشد
+        # اولین MP4
+        # =====================================================
+
+        if not selected_video:
+
+            selected_video = (
+                all_video_urls[0]
+            )
+
+        # =====================================================
+        # نتیجه نهایی
+        # =====================================================
+
+        print(
+            "========================================"
+        )
+
+        print(
+            "🎬 SELECTED APARAT VIDEO"
+        )
+
+        print(
+            "PROFILE:",
+            selected_video.get(
+                "profile",
+                ""
+            )
+        )
+
+        print(
+            "VIDEO URL:",
+            selected_video.get(
+                "url",
+                ""
+            )
+        )
+
+        print(
+            "========================================"
+        )
+
+        return selected_video.get(
+            "url"
+        )
 
     except Exception as e:
 
         print(
-            "APARAT ERROR:",
-            e
+            "❌ APARAT ERROR:",
+            repr(e)
         )
 
-    return None
+        return None
 
 
 # =========================================================
@@ -1030,16 +1520,24 @@ def send_news(
 
         print(
             "VIDEO CHECK ERROR:",
-            e
+            repr(e)
         )
+
+    # =====================================================
+    # SEND VIDEO
+    # =====================================================
 
     if video_url:
 
         try:
 
+            print(
+                "🎬 DOWNLOADING VIDEO..."
+            )
+
             media_response = requests.get(
                 video_url,
-                timeout=60,
+                timeout=120,
                 stream=True,
                 headers={
                     "User-Agent":
@@ -1059,85 +1557,138 @@ def send_news(
                 )
             )
 
-            if (
-                media_response.status_code == 200
-                and
-                "video" in
+            print(
+                "MEDIA CONTENT LENGTH:",
                 media_response.headers.get(
-                    "content-type",
-                    ""
+                    "content-length"
                 )
-            ):
+            )
 
-                temp_file = (
-                    "temp_video.mp4"
-                )
+            if media_response.status_code == 200:
 
-                with open(
-                    temp_file,
-                    "wb"
-                ) as f:
-
-                    for chunk in media_response.iter_content(
-                        chunk_size=1024 * 1024
-                    ):
-
-                        if chunk:
-
-                            f.write(
-                                chunk
-                            )
-
-                print(
-                    "✅ VIDEO DOWNLOADED"
+                content_type = (
+                    media_response.headers.get(
+                        "content-type",
+                        ""
+                    ).lower()
                 )
 
-                caption = (
-                    f"⚽️ <b>"
-                    f"{html.escape(title)}"
-                    f"</b>\n\n"
-                    f"{hashtags}\n\n"
-                    f"@ligebartar24"
+                # بعضی سرورها ممکن است
+                # content-type درست ندهند.
+                # بنابراین علاوه بر video،
+                # mp4 را هم قبول می‌کنیم.
+
+                is_video = (
+                    "video" in content_type
+                    or
+                    ".mp4" in video_url.lower()
                 )
 
-                asyncio.get_event_loop().run_until_complete(
+                if is_video:
 
-                    bot.send_video(
-                        chat_id=CHANNEL,
-                        video=open(
-                            temp_file,
-                            "rb"
-                        ),
-                        caption=caption,
-                        parse_mode=ParseMode.HTML,
-                        supports_streaming=True
+                    temp_file = (
+                        "temp_video.mp4"
                     )
 
-                )
+                    with open(
+                        temp_file,
+                        "wb"
+                    ) as f:
 
-                try:
+                        for chunk in media_response.iter_content(
+                            chunk_size=1024 * 1024
+                        ):
 
-                    os.remove(
+                            if chunk:
+
+                                f.write(
+                                    chunk
+                                )
+
+                    file_size = os.path.getsize(
                         temp_file
                     )
 
-                except:
+                    print(
+                        "✅ VIDEO DOWNLOADED"
+                    )
 
-                    pass
+                    print(
+                        "VIDEO FILE SIZE:",
+                        file_size,
+                        "bytes"
+                    )
 
-                print(
-                    "✅ VIDEO NEWS SENT:",
-                    title
-                )
+                    if file_size > 0:
 
-                return True
+                        caption = (
+                            f"⚽️ <b>"
+                            f"{html.escape(title)}"
+                            f"</b>\n\n"
+                            f"{hashtags}\n\n"
+                            f"@ligebartar24"
+                        )
+
+                        with open(
+                            temp_file,
+                            "rb"
+                        ) as video_file:
+
+                            asyncio.get_event_loop().run_until_complete(
+
+                                bot.send_video(
+                                    chat_id=CHANNEL,
+                                    video=video_file,
+                                    caption=caption,
+                                    parse_mode=ParseMode.HTML,
+                                    supports_streaming=True
+                                )
+
+                            )
+
+                        try:
+
+                            os.remove(
+                                temp_file
+                            )
+
+                        except Exception:
+
+                            pass
+
+                        print(
+                            "✅ VIDEO NEWS SENT:",
+                            title
+                        )
+
+                        return True
+
+                    else:
+
+                        print(
+                            "❌ VIDEO FILE IS EMPTY"
+                        )
 
         except Exception as e:
 
             print(
                 "VIDEO SEND ERROR:",
-                e
+                repr(e)
             )
+
+            try:
+
+                if os.path.exists(
+                    "temp_video.mp4"
+                ):
+
+                    os.remove(
+                        "temp_video.mp4"
+                    )
+
+            except Exception:
+
+                pass
 
     # =====================================================
     # IMAGE
@@ -1431,6 +1982,9 @@ def main():
     )
 
 
+# =========================================================
+# START
+# =========================================================
 
 if __name__ == "__main__":
     main()
