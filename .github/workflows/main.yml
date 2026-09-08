@@ -2,7 +2,6 @@ name: Main Yamal
 
 on:
   workflow_dispatch:
-
   schedule:
     - cron: '7,22,37,52 * * * *'
 
@@ -37,9 +36,7 @@ jobs:
           echo "========================================"
           echo "TESTING RSS 66"
           echo "========================================"
-          curl -L --max-time 20 -A "Mozilla/5.0" -v \
-            "https://www.khabarvarzeshi.com/rss/tp/66" \
-            -o /tmp/rss66.xml
+          curl -L --max-time 20 -A "Mozilla/5.0" "https://www.khabarvarzeshi.com/rss/tp/66" -o /tmp/rss66.xml
           echo "CURL EXIT CODE: $?"
           echo "RSS 66 FILE SIZE:"
           wc -c /tmp/rss66.xml
@@ -83,4 +80,3 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-`
