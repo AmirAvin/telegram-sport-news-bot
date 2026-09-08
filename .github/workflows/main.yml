@@ -2,9 +2,8 @@ name: Main Yamal
 
 on:
   workflow_dispatch:
-
   schedule:
-    - cron: - cron: '*/30 * * * *'
+    - cron: '*/30 * * * *'
 
 permissions:
   contents: write
@@ -68,3 +67,4 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+``
