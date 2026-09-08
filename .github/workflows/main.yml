@@ -37,8 +37,33 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHANNEL: ${{ secrets.CHANNEL }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          PYTHONUNBUFFERED: '1'
         run: |
-          python bot.py
+          set -o pipefail
+          echo "========================================"
+          echo "STARTING FOOTBALL BOT"
+          echo "========================================"
+          python -u bot.py 2>&1 | tee bot.log
+          echo "========================================"
+          echo "BOT PROCESS FINISHED"
+          echo "========================================"
+
+      - name: Show bot log
+        if: always()
+        run: |
+          echo "========================================"
+          echo "FULL BOT LOG"
+          echo "========================================"
+
+          if [ -f bot.log ]; then
+            cat bot.log
+          else
+            echo "bot.log was not created."
+          fi
+
+          echo "========================================"
+          echo "END BOT LOG"
+          echo "========================================"
 
       - name: Save bot data
         if: always()
