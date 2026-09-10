@@ -330,6 +330,89 @@ def normalize_title(text):
 
 
 # ============================================================
+# SMART TEXT TRUNCATE
+# ============================================================
+
+def truncate_to_sentence(text, max_length):
+
+    if not text:
+        return ""
+
+    text = str(text).strip()
+
+    if len(text) <= max_length:
+        return text
+
+    candidate = text[:max_length].rstrip()
+
+    # پایان جمله
+    sentence_endings = [
+        "؟",
+        "?",
+        "!",
+        "！",
+        "。",
+        ".",
+        "؛",
+        ";"
+    ]
+
+    positions = []
+
+    for ending in sentence_endings:
+
+        position = candidate.rfind(
+            ending
+        )
+
+        if position >= 0:
+            positions.append(
+                position
+            )
+
+    if positions:
+
+        last_position = max(
+            positions
+        )
+
+        result = candidate[
+            :last_position + 1
+        ].strip()
+
+        if result:
+            return result
+
+    # اگر پایان جمله پیدا نشد،
+    # آخرین پاراگراف کامل را انتخاب کن
+    paragraph_position = candidate.rfind(
+        "\n\n"
+    )
+
+    if paragraph_position > 0:
+
+        result = candidate[
+            :paragraph_position
+        ].strip()
+
+        if result:
+            return result
+
+    # در نهایت تا آخرین کلمه کامل
+    space_position = candidate.rfind(
+        " "
+    )
+
+    if space_position > 0:
+
+        return candidate[
+            :space_position
+        ].strip()
+
+    return candidate.strip()
+
+
+# ============================================================
 # SMART HASHTAGS
 # ============================================================
 
@@ -718,7 +801,6 @@ def get_article_text(url):
             "html.parser"
         )
 
-        # حذف عناصر غیرخبری
         for tag in soup([
             "script",
             "style",
@@ -1416,6 +1498,144 @@ def get_entry_image(news):
 
 
 # ============================================================
+# BUILD CAPTION
+# ============================================================
+
+def build_media_caption(
+    title,
+    article_text,
+    hashtags
+):
+
+    safe_title = html.escape(
+        title
+    )
+
+    safe_hashtags = html.escape(
+        hashtags
+    )
+
+    footer = (
+        f"\n\n{safe_hashtags}"
+        f"\n\n@ligebartar24"
+    )
+
+    # سقف امن برای کپشن تلگرام
+    TELEGRAM_CAPTION_LIMIT = 1024
+
+    # فضای عنوان + فاصله‌ها + هشتگ و فوتر
+    fixed_part = (
+        f"<b>{safe_title}</b>\n\n"
+    )
+
+    available = (
+        TELEGRAM_CAPTION_LIMIT
+        - len(fixed_part)
+        - len(footer)
+        - 5
+    )
+
+    if available < 50:
+        available = 50
+
+    media_text = truncate_to_sentence(
+        article_text,
+        available
+    )
+
+    caption = (
+        fixed_part
+        + html.escape(media_text)
+        + footer
+    )
+
+    # کنترل نهایی؛ نباید از محدودیت عبور کند
+    if len(caption) > TELEGRAM_CAPTION_LIMIT:
+
+        available -= (
+            len(caption)
+            - TELEGRAM_CAPTION_LIMIT
+        )
+
+        media_text = truncate_to_sentence(
+            article_text,
+            max(50, available)
+        )
+
+        caption = (
+            fixed_part
+            + html.escape(media_text)
+            + footer
+        )
+
+    print(
+        "CAPTION LENGTH:",
+        len(caption)
+    )
+
+    return caption
+
+
+# ============================================================
+# BUILD TEXT MESSAGE
+# ============================================================
+
+def build_text_message(
+    title,
+    article_text,
+    hashtags
+):
+
+    safe_title = html.escape(
+        title
+    )
+
+    safe_hashtags = html.escape(
+        hashtags
+    )
+
+    footer = (
+        f"\n\n{safe_hashtags}"
+        f"\n\n@ligebartar24"
+    )
+
+    # محدودیت پیام متنی تلگرام
+    TELEGRAM_TEXT_LIMIT = 4096
+
+    fixed_part = (
+        f"<b>{safe_title}</b>\n\n"
+    )
+
+    available = (
+        TELEGRAM_TEXT_LIMIT
+        - len(fixed_part)
+        - len(footer)
+        - 5
+    )
+
+    if available < 100:
+        available = 100
+
+    text_message = truncate_to_sentence(
+        article_text,
+        available
+    )
+
+    result = (
+        fixed_part
+        + html.escape(text_message)
+        + footer
+    )
+
+    print(
+        "TEXT MESSAGE LENGTH:",
+        len(result)
+    )
+
+    return result
+
+
+# ============================================================
 # SEND NEWS
 # ============================================================
 
@@ -1468,7 +1688,7 @@ def send_news(
     )
 
     # --------------------------------------------------------
-    # هشتگ‌ها از تیتر + متن واقعی
+    # هشتگ‌ها
     # --------------------------------------------------------
 
     hashtags = create_hashtags(
@@ -1481,45 +1701,14 @@ def send_news(
         hashtags
     )
 
-    safe_title = html.escape(
-        title
-    )
-
     # --------------------------------------------------------
-    # متن کوتاه برای عکس و ویدئو
+    # CAPTION هوشمند
     # --------------------------------------------------------
 
-    media_text = article_text[:650]
-
-    if len(article_text) > 650:
-        media_text += "..."
-
-    media_text = html.escape(
-        media_text
-    )
-
-    # --------------------------------------------------------
-    # متن کامل‌تر برای پیام متنی
-    # --------------------------------------------------------
-
-    text_message = article_text[:3000]
-
-    if len(article_text) > 3000:
-        text_message += "..."
-
-    text_message = html.escape(
-        text_message
-    )
-
-    # --------------------------------------------------------
-    # CAPTION
-    # --------------------------------------------------------
-
-    caption = (
-        f"<b>{safe_title}</b>\n\n"
-        f"{media_text}\n\n"
-        f"{hashtags}\n\n"
-        f"@ligebartar24"
+    caption = build_media_caption(
+        title,
+        article_text,
+        hashtags
     )
 
     # ========================================================
@@ -1737,19 +1926,16 @@ def send_news(
 
     try:
 
-        text_caption = (
-            f"<b>{safe_title}</b>\n\n"
-            f"{text_message}\n\n"
-            f"{hashtags}\n\n"
-            f"@ligebartar24"
+        text_message = build_text_message(
+            title,
+            article_text,
+            hashtags
         )
-
-        text_caption = text_caption[:4090]
 
         asyncio.get_event_loop().run_until_complete(
             bot.send_message(
                 chat_id=CHANNEL,
-                text=text_caption,
+                text=text_message,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
