@@ -15,14 +15,14 @@ concurrency:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -42,7 +42,9 @@ jobs:
           echo "========================================"
           echo "STARTING FOOTBALL BOT"
           echo "========================================"
+
           python -u bot.py 2>&1 | tee bot.log
+
           echo "========================================"
           echo "BOT PROCESS FINISHED"
           echo "========================================"
@@ -53,11 +55,13 @@ jobs:
           echo "========================================"
           echo "FULL BOT LOG"
           echo "========================================"
+
           if [ -f bot.log ]; then
             cat bot.log
           else
             echo "bot.log was not created."
           fi
+
           echo "========================================"
           echo "END BOT LOG"
-          echo "========================================
+          echo "========================================"
