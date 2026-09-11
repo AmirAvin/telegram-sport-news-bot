@@ -3,28 +3,43 @@ import requests
 
 token = os.getenv("SPORTMONKS_TOKEN")
 
-print("=== LIVE BOT TEST ===")
+result = []
+
+result.append("=== SPORTMONKS TEST ===")
 
 if not token:
-    print("TOKEN NOT FOUND")
-    raise SystemExit(1)
+    result.append("TOKEN: NOT FOUND")
+else:
+    result.append("TOKEN: FOUND")
 
-print("TOKEN FOUND")
+    try:
+        response = requests.get(
+            "https://api.sportmonks.com/v3/football/livescores",
+            headers={
+                "Authorization": token,
+                "Accept": "application/json"
+            },
+            timeout=30
+        )
 
-url = "https://api.sportmonks.com/v3/football/livescores"
+        result.append(f"HTTP STATUS: {response.status_code}")
+        result.append(f"RESPONSE LENGTH: {len(response.text)}")
 
-response = requests.get(
-    url,
-    headers={"Authorization": token},
-    timeout=30
-)
+        try:
+            data = response.json()
 
-print("STATUS:", response.status_code)
+            result.append(f"RESULTS: {data.get('results')}")
+            result.append(f"ERRORS: {data.get('errors')}")
+            result.append(f"MESSAGE: {data.get('message')}")
 
-try:
-    data = response.json()
-    print("RESULTS:", data.get("results"))
-    print("MESSAGE:", data.get("message"))
-    print("ERRORS:", data.get("errors"))
-except Exception:
-    print("RAW:", response.text[:1000])
+        except Exception:
+            result.append("JSON ERROR")
+            result.append(response.text[:1000])
+
+    except Exception as e:
+        result.append(f"REQUEST ERROR: {repr(e)}")
+
+with open("sportmonks_test.txt", "w", encoding="utf-8") as f:
+    f.write("\n".join(result))
+
+print("\n".join(result))
