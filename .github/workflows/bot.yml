@@ -31,4 +31,3 @@ jobs:
           echo "===== STARTING BOT ====="
           python -u bot.py
           echo "===== BOT FINISHED ====="
-`
