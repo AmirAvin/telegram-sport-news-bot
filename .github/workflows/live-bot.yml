@@ -25,8 +25,28 @@ jobs:
         run: pip install requests
 
       - name: Run Live Bot
+        continue-on-error: true
         env:
           SPORTMONKS_TOKEN: ${{ secrets.SPORTMONKS_TOKEN }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: python live_bot.py
+
+      - name: Check test file
+        if: always()
+        run: |
+          echo "===== FILE CHECK ====="
+          if [ -f sportmonks_test.txt ]; then
+            echo "TEST FILE FOUND"
+            cat sportmonks_test.txt
+          else
+            echo "TEST FILE NOT FOUND"
+          fi
+
+      - name: Upload Sportmonks Test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sportmonks-test
+          path: sportmonks_test.txt
+          if-no-files-found: warn
