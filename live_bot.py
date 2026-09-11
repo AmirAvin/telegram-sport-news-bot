@@ -1,35 +1,30 @@
 import os
 import requests
 
-TOKEN = os.getenv("SPORTMONKS_TOKEN")
+token = os.getenv("SPORTMONKS_TOKEN")
 
-print("===== LIVE FOOTBALL BOT =====")
+print("=== LIVE BOT TEST ===")
 
-if not TOKEN:
-    print("ERROR: SPORTMONKS_TOKEN NOT FOUND")
+if not token:
+    print("TOKEN NOT FOUND")
     raise SystemExit(1)
 
-print("TOKEN: FOUND")
+print("TOKEN FOUND")
 
 url = "https://api.sportmonks.com/v3/football/livescores"
 
-headers = {
-    "Authorization": TOKEN,
-    "Accept": "application/json",
-}
+response = requests.get(
+    url,
+    headers={"Authorization": token},
+    timeout=30
+)
+
+print("STATUS:", response.status_code)
 
 try:
-    response = requests.get(
-        url,
-        headers=headers,
-        timeout=30
-    )
-
-    print("HTTP STATUS:", response.status_code)
-    print("RESPONSE LENGTH:", len(response.text))
-    print("RESPONSE:")
-    print(response.text[:5000])
-
-except Exception as e:
-    print("REQUEST ERROR:", repr(e))
-    raise
+    data = response.json()
+    print("RESULTS:", data.get("results"))
+    print("MESSAGE:", data.get("message"))
+    print("ERRORS:", data.get("errors"))
+except Exception:
+    print("RAW:", response.text[:1000])
