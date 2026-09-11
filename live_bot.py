@@ -1,45 +1,39 @@
-import os
-import requests
+name: Live Football Bot
 
-token = os.getenv("SPORTMONKS_TOKEN")
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/2 * * * *"
 
-result = []
+permissions:
+  contents: write
 
-result.append("=== SPORTMONKS TEST ===")
+jobs:
+  live-bot:
+    runs-on: ubuntu-latest
 
-if not token:
-    result.append("TOKEN: NOT FOUND")
-else:
-    result.append("TOKEN: FOUND")
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    try:
-        response = requests.get(
-            "https://api.sportmonks.com/v3/football/livescores",
-            headers={
-                "Authorization": token,
-                "Accept": "application/json"
-            },
-            timeout=30
-        )
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-        result.append(f"HTTP STATUS: {response.status_code}")
-        result.append(f"RESPONSE LENGTH: {len(response.text)}")
+      - name: Install dependencies
+        run: pip install requests
 
-        try:
-            data = response.json()
+      - name: Run Live Bot
+        env:
+          SPORTMONKS_TOKEN: ${{ secrets.SPORTMONKS_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python live_bot.py
 
-            result.append(f"RESULTS: {data.get('results')}")
-            result.append(f"ERRORS: {data.get('errors')}")
-            result.append(f"MESSAGE: {data.get('message')}")
-
-        except Exception:
-            result.append("JSON ERROR")
-            result.append(response.text[:1000])
-
-    except Exception as e:
-        result.append(f"REQUEST ERROR: {repr(e)}")
-
-with open("sportmonks_test.txt", "w", encoding="utf-8") as f:
-    f.write("\n".join(result))
-
-print("\n".join(result))
+      - name: Upload Sportmonks Test
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sportmonks-test
+          path: sportmonks_test.txt
