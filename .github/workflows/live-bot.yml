@@ -1,24 +1,32 @@
-import os
-import requests
+name: Live Football Bot
 
-TOKEN = os.getenv("SPORTMONKS_TOKEN")
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/2 * * * *"
 
-if not TOKEN:
-    raise RuntimeError("SPORTMONKS_TOKEN پیدا نشد")
+permissions:
+  contents: write
 
-url = "https://api.sportmonks.com/v3/football/livescores"
+jobs:
+  live-bot:
+    runs-on: ubuntu-latest
 
-headers = {
-    "Authorization": TOKEN,
-    "Accept": "application/json",
-}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-response = requests.get(url, headers=headers, timeout=30)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-print("STATUS:", response.status_code)
-print("RESPONSE:")
+      - name: Install dependencies
+        run: pip install requests
 
-try:
-    print(response.json())
-except Exception:
-    print(response.text)
+      - name: Run Live Bot
+        env:
+          SPORTMONKS_TOKEN: ${{ secrets.SPORTMONKS_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python live_bot.py
