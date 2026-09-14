@@ -39,6 +39,7 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           set -o pipefail
+
           echo "========================================"
           echo "STARTING FOOTBALL BOT"
           echo "========================================"
@@ -48,6 +49,38 @@ jobs:
           echo "========================================"
           echo "BOT PROCESS FINISHED"
           echo "========================================"
+
+      - name: Save news database
+        if: always()
+        run: |
+          echo "========================================"
+          echo "SAVING NEWS DATABASE"
+          echo "========================================"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ -f sent_news.json ]; then
+            git add sent_news.json
+            echo "sent_news.json found"
+          else
+            echo "sent_news.json not found"
+          fi
+
+          if [ -f last_run.json ]; then
+            git add last_run.json
+            echo "last_run.json found"
+          else
+            echo "last_run.json not found"
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No database changes to save."
+          else
+            git commit -m "Update news database"
+            git push
+            echo "News database saved successfully."
+          fi
 
       - name: Show bot log
         if: always()
