@@ -2,8 +2,6 @@ name: Main Yamal
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "*/30 * * * *"
 
 permissions:
   contents: write
@@ -18,83 +16,9 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install requirements
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run bot
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL: ${{ secrets.CHANNEL }}
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-          PYTHONUNBUFFERED: "1"
-        run: |
-          set -o pipefail
-
-          echo "========================================"
-          echo "STARTING FOOTBALL BOT"
-          echo "========================================"
-
-          python -u bot.py 2>&1 | tee bot.log
-
-          echo "========================================"
-          echo "BOT PROCESS FINISHED"
-          echo "========================================"
-
-      - name: Save news database
-        if: always()
+      - name: Bot Disabled
         run: |
           echo "========================================"
-          echo "SAVING NEWS DATABASE"
-          echo "========================================"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if [ -f sent_news.json ]; then
-            git add sent_news.json
-            echo "sent_news.json found"
-          else
-            echo "sent_news.json not found"
-          fi
-
-          if [ -f last_run.json ]; then
-            git add last_run.json
-            echo "last_run.json found"
-          else
-            echo "last_run.json not found"
-          fi
-
-          if git diff --cached --quiet; then
-            echo "No database changes to save."
-          else
-            git commit -m "Update news database"
-            git push
-            echo "News database saved successfully."
-          fi
-
-      - name: Show bot log
-        if: always()
-        run: |
-          echo "========================================"
-          echo "FULL BOT LOG"
-          echo "========================================"
-
-          if [ -f bot.log ]; then
-            cat bot.log
-          else
-            echo "bot.log was not created."
-          fi
-
-          echo "========================================"
-          echo "END BOT LOG"
+          echo "FOOTBALL NEWS BOT IS TEMPORARILY DISABLED"
+          echo "NO NEWS WILL BE SENT"
           echo "========================================"
