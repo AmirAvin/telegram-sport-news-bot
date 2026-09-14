@@ -8,7 +8,9 @@ import feedparser
 import asyncio
 import calendar
 import hashlib
+
 from urllib.parse import urlsplit, urlunsplit
+from difflib import SequenceMatcher
 
 from bs4 import BeautifulSoup
 from telegram import Bot
@@ -26,7 +28,6 @@ API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY")
 SENT_FILE = "sent_news.json"
 LAST_RUN_FILE = "last_run.json"
 
-# حداکثر تعداد خبر در هر اجرا
 MAX_NEWS_PER_RUN = 10
 
 USER_AGENT = (
@@ -77,23 +78,32 @@ FOOTBALL_KEYWORDS = [
     "جام حذفی", "جام جهانی", "لیگ قهرمانان",
     "لیگ اروپا", "لیگ کنفرانس",
 
-    "تیم ملی", "تیم‌ملی", "مربی", "سرمربی",
-    "بازیکن", "مهاجم", "مدافع", "دروازه بان",
-    "دروازه‌بان", "گلزن", "گلزنی", "گل",
+    "تیم ملی", "تیم‌ملی",
+    "مربی", "سرمربی",
+    "بازیکن", "مهاجم", "مدافع",
+    "دروازه بان", "دروازه‌بان",
+    "گلزن", "گلزنی", "گل",
     "پنالتی", "کارت قرمز", "کارت زرد",
-    "داوری", "داور", "VAR", "ویدیو", "ویدئو",
+    "داوری", "داور", "VAR",
+    "ویدیو", "ویدئو",
 
-    "طارمی", "مهدی طارمی", "آزمون", "سردار آزمون",
-    "قلی زاده", "قلی‌زاده", "محبی", "محمد محبی",
-    "جهانبخش", "قدوس", "بیرانوند", "حسین حسینی",
-    "قلعه نویی", "قلعه‌نویی", "مجیدی", "جباری",
+    "طارمی", "مهدی طارمی",
+    "آزمون", "سردار آزمون",
+    "قلی زاده", "قلی‌زاده",
+    "محبی", "محمد محبی",
+    "جهانبخش", "قدوس",
+    "بیرانوند", "حسین حسینی",
+    "قلعه نویی", "قلعه‌نویی",
+    "مجیدی", "جباری",
     "پیروز قربانی", "نویدکیا", "تارتار",
-    "سهراب بختیاری زاده", "سهراب بختیاری‌زاده",
+    "سهراب بختیاری زاده",
+    "سهراب بختیاری‌زاده",
 
     "رئال مادرید", "بارسلونا", "اتلتیکو",
-    "منچستریونایتد", "منچسترسیتی", "لیورپول",
-    "آرسنال", "چلسی", "تاتنهام", "بایرن",
-    "دورتموند", "یوونتوس", "اینتر", "میلان",
+    "منچستریونایتد", "منچسترسیتی",
+    "لیورپول", "آرسنال", "چلسی",
+    "تاتنهام", "بایرن", "دورتموند",
+    "یوونتوس", "اینتر", "میلان",
     "پاری سن ژرمن", "پاری‌سن‌ژرمن",
     "ناپولی", "رم", "لاتزیو",
 
@@ -235,12 +245,22 @@ def normalize_title(text):
 
     text = html.unescape(str(text))
 
-    text = text.replace("ي", "ی")
-    text = text.replace("ى", "ی")
-    text = text.replace("ك", "ک")
-    text = text.replace("\u200c", " ")
+    replacements = {
+        "ي": "ی",
+        "ى": "ی",
+        "ك": "ک",
+        "ۀ": "ه",
+        "ة": "ه",
+        "\u200c": " ",
+        "\u200d": " ",
+        "\u200e": " ",
+        "\u200f": " ",
+        "\ufeff": " ",
+    }
 
-    # حذف علائم و فاصله‌های اضافی
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
     text = re.sub(r"[ًٌٍَُِّْـ]", "", text)
     text = re.sub(r"[^\w\sآ-ی]", " ", text)
     text = re.sub(r"\s+", " ", text)
@@ -258,10 +278,10 @@ def normalize_url(url):
         return ""
 
     try:
-        parts = urlsplit(url.strip())
 
-        # حذف query و fragment
-        clean = urlunsplit((
+        parts = urlsplit(str(url).strip())
+
+        return urlunsplit((
             parts.scheme.lower(),
             parts.netloc.lower(),
             parts.path.rstrip("/"),
@@ -269,10 +289,8 @@ def normalize_url(url):
             ""
         ))
 
-        return clean
-
     except Exception:
-        return url.strip().lower()
+        return str(url).strip().lower()
 
 
 # ============================================================
@@ -293,13 +311,37 @@ def make_news_fingerprint(title):
 
 def make_news_key(news):
 
-    title = news.get("title", "")
-    link = news.get("link", "")
+    title_hash = make_news_fingerprint(
+        news.get("title", "")
+    )
 
-    title_hash = make_news_fingerprint(title)
-    clean_link = normalize_url(link)
+    clean_link = normalize_url(
+        news.get("link", "")
+    )
 
     return f"title:{title_hash}|url:{clean_link}"
+
+
+# ============================================================
+# SMART TITLE SIMILARITY
+# ============================================================
+
+def title_similarity(title1, title2):
+
+    a = normalize_title(title1)
+    b = normalize_title(title2)
+
+    if not a or not b:
+        return 0.0
+
+    if a == b:
+        return 1.0
+
+    return SequenceMatcher(
+        None,
+        a,
+        b
+    ).ratio()
 
 
 # ============================================================
@@ -334,10 +376,8 @@ def truncate_to_sentence(text, max_length):
 
     if positions:
 
-        last_position = max(positions)
-
         result = candidate[
-            :last_position + 1
+            :max(positions) + 1
         ].strip()
 
         if result:
@@ -346,13 +386,7 @@ def truncate_to_sentence(text, max_length):
     paragraph_position = candidate.rfind("\n\n")
 
     if paragraph_position > 0:
-
-        result = candidate[
-            :paragraph_position
-        ].strip()
-
-        if result:
-            return result
+        return candidate[:paragraph_position].strip()
 
     space_position = candidate.rfind(" ")
 
@@ -363,12 +397,11 @@ def truncate_to_sentence(text, max_length):
 
 
 # ============================================================
-# SMART HASHTAGS
+# HASHTAGS
 # ============================================================
 
 def create_hashtags(title, article_text=""):
 
-    # فقط عنوان + متن واقعی خبر
     full_text = f"{title} {article_text}"
     normalized = normalize_title(full_text)
 
@@ -431,7 +464,6 @@ def load_sent_news():
         elif isinstance(data, dict):
 
             for key in data.keys():
-
                 result.add(str(key))
 
         return result
@@ -476,45 +508,135 @@ def save_sent_news(sent):
         )
 
 
+# ============================================================
+# HISTORICAL DATABASE HELPERS
+# ============================================================
+
+def sent_contains_url(normalized_link, sent):
+
+    if not normalized_link:
+        return False
+
+    for item in sent:
+
+        if not isinstance(item, str):
+            continue
+
+        if item.startswith("title:"):
+            continue
+
+        if item.startswith("http://") or item.startswith("https://"):
+
+            if normalize_url(item) == normalized_link:
+                return True
+
+    return False
+
+
+def sent_contains_title_hash(title_hash, sent):
+
+    if not title_hash:
+        return False
+
+    if title_hash in sent:
+        return True
+
+    for item in sent:
+
+        if not isinstance(item, str):
+            continue
+
+        if item.startswith("title:"):
+
+            parts = item.split("|", 1)
+
+            if parts:
+
+                stored_hash = parts[0].replace(
+                    "title:",
+                    "",
+                    1
+                )
+
+                if stored_hash == title_hash:
+                    return True
+
+    return False
+
+
+def migrate_historical_news(news, sent):
+
+    """
+    اگر لینک خبر قبلاً در دیتابیس قدیمی بوده،
+    عنوان آن را هم در دیتابیس ثبت می‌کنیم.
+    بنابراین اگر سایت لینک را عوض کند،
+    خبر دوباره ارسال نمی‌شود.
+    """
+
+    link = news.get("link", "")
+    title = news.get("title", "")
+
+    clean_link = normalize_url(link)
+    title_hash = make_news_fingerprint(title)
+
+    changed = False
+
+    if sent_contains_url(clean_link, sent):
+
+        if clean_link and clean_link not in sent:
+            sent.add(clean_link)
+            changed = True
+
+        if title_hash and title_hash not in sent:
+            sent.add(title_hash)
+            changed = True
+
+        key = make_news_key(news)
+
+        if key not in sent:
+            sent.add(key)
+            changed = True
+
+        if changed:
+
+            print(
+                "🔄 HISTORICAL NEWS DATABASE UPDATED:",
+                title
+            )
+
+        return True
+
+    return False
+
+
 def is_already_sent(news, sent):
 
     link = news.get("link", "")
     title = news.get("title", "")
 
-    normalized_link = normalize_url(link)
+    clean_link = normalize_url(link)
     title_hash = make_news_fingerprint(title)
+    key = make_news_key(news)
 
-    # لینک اصلی
-    if link in sent:
+    # لینک دقیق
+    if link and link in sent:
         return True
 
     # لینک نرمال‌شده
-    if normalized_link in sent:
+    if clean_link and clean_link in sent:
+        return True
+
+    # لینک موجود در دیتابیس قدیمی
+    if sent_contains_url(clean_link, sent):
         return True
 
     # هش عنوان
-    if title_hash in sent:
+    if sent_contains_title_hash(title_hash, sent):
         return True
 
     # کلید ترکیبی
-    key = make_news_key(news)
-
     if key in sent:
         return True
-
-    # بررسی دیتابیس‌های قدیمی
-    for old_item in sent:
-
-        if not isinstance(old_item, str):
-            continue
-
-        if old_item == title_hash:
-            return True
-
-        if old_item.startswith("title:"):
-
-            if title_hash in old_item:
-                return True
 
     return False
 
@@ -528,6 +650,9 @@ def register_sent(news, sent):
     title_hash = make_news_fingerprint(title)
     key = make_news_key(news)
 
+    if link:
+        sent.add(link)
+
     if clean_link:
         sent.add(clean_link)
 
@@ -535,8 +660,6 @@ def register_sent(news, sent):
         sent.add(title_hash)
 
     sent.add(key)
-
-    save_sent_news(sent)
 
 
 # ============================================================
@@ -627,7 +750,7 @@ def is_football_news(title):
 
 
 # ============================================================
-# GET RSS NEWS
+# RSS
 # ============================================================
 
 def get_news(rss_url):
@@ -744,7 +867,7 @@ def get_news_timestamp(news):
 
 
 # ============================================================
-# REAL ARTICLE TEXT
+# ARTICLE TEXT
 # ============================================================
 
 def get_article_text(url):
@@ -1198,7 +1321,11 @@ def get_aparat_video(url, news_entry=None):
             seen.add(item["url"])
             unique.append(item)
 
-        for quality in ["360p", "240p", "144p"]:
+        for quality in [
+            "360p",
+            "240p",
+            "144p"
+        ]:
 
             for item in unique:
 
@@ -1309,7 +1436,7 @@ def get_entry_image(news):
 
 
 # ============================================================
-# BUILD CAPTION
+# CAPTIONS
 # ============================================================
 
 def build_media_caption(
@@ -1326,21 +1453,23 @@ def build_media_caption(
         f"\n\n@ligebartar24"
     )
 
-    TELEGRAM_CAPTION_LIMIT = 1024
+    limit = 1024
 
     fixed_part = (
         f"<b>{safe_title}</b>\n\n"
     )
 
     available = (
-        TELEGRAM_CAPTION_LIMIT
+        limit
         - len(fixed_part)
         - len(footer)
         - 5
     )
 
-    if available < 50:
-        available = 50
+    available = max(
+        available,
+        50
+    )
 
     media_text = truncate_to_sentence(
         article_text,
@@ -1353,11 +1482,10 @@ def build_media_caption(
         + footer
     )
 
-    if len(caption) > TELEGRAM_CAPTION_LIMIT:
+    if len(caption) > limit:
 
         available -= (
-            len(caption)
-            - TELEGRAM_CAPTION_LIMIT
+            len(caption) - limit
         )
 
         media_text = truncate_to_sentence(
@@ -1374,10 +1502,6 @@ def build_media_caption(
     return caption
 
 
-# ============================================================
-# BUILD TEXT MESSAGE
-# ============================================================
-
 def build_text_message(
     title,
     article_text,
@@ -1392,21 +1516,23 @@ def build_text_message(
         f"\n\n@ligebartar24"
     )
 
-    TELEGRAM_TEXT_LIMIT = 4096
+    limit = 4096
 
     fixed_part = (
         f"<b>{safe_title}</b>\n\n"
     )
 
     available = (
-        TELEGRAM_TEXT_LIMIT
+        limit
         - len(fixed_part)
         - len(footer)
         - 5
     )
 
-    if available < 100:
-        available = 100
+    available = max(
+        available,
+        100
+    )
 
     text_message = truncate_to_sentence(
         article_text,
@@ -1707,7 +1833,7 @@ def process_rss_news(bot, sent):
     all_new_news = []
 
     # ========================================================
-    # دریافت اخبار
+    # دریافت RSS
     # ========================================================
 
     for rss_url in RSS_SOURCES:
@@ -1724,11 +1850,30 @@ def process_rss_news(bot, sent):
 
             title = news["title"]
 
-            # --------------------------------------------
-            # بررسی دیتابیس
-            # --------------------------------------------
+            # ------------------------------------------------
+            # ابتدا دیتابیس قدیمی را بررسی و مهاجرت می‌کنیم
+            # ------------------------------------------------
 
-            if is_already_sent(news, sent):
+            if migrate_historical_news(
+                news,
+                sent
+            ):
+
+                print(
+                    "🚫 HISTORICAL ALREADY SENT:",
+                    title
+                )
+
+                continue
+
+            # ------------------------------------------------
+            # بررسی کامل دیتابیس
+            # ------------------------------------------------
+
+            if is_already_sent(
+                news,
+                sent
+            ):
 
                 print(
                     "🚫 ALREADY SENT:",
@@ -1737,11 +1882,13 @@ def process_rss_news(bot, sent):
 
                 continue
 
-            # --------------------------------------------
-            # بررسی تاریخ
-            # --------------------------------------------
+            # ------------------------------------------------
+            # تاریخ
+            # ------------------------------------------------
 
-            news_timestamp = get_news_timestamp(news)
+            news_timestamp = get_news_timestamp(
+                news
+            )
 
             if news_timestamp is None:
 
@@ -1769,7 +1916,7 @@ def process_rss_news(bot, sent):
             all_new_news.append(news)
 
     # ========================================================
-    # حذف تکراری با عنوان
+    # حذف تکراری‌های همین اجرا
     # ========================================================
 
     unique_news = []
@@ -1796,7 +1943,7 @@ def process_rss_news(bot, sent):
 
             continue
 
-        if clean_url in seen_urls:
+        if clean_url and clean_url in seen_urls:
 
             print(
                 "🚫 DUPLICATE URL:",
@@ -1806,14 +1953,16 @@ def process_rss_news(bot, sent):
             continue
 
         seen_titles.add(title_hash)
-        seen_urls.add(clean_url)
+
+        if clean_url:
+            seen_urls.add(clean_url)
 
         unique_news.append(news)
 
     all_new_news = unique_news
 
     # ========================================================
-    # مرتب‌سازی قدیمی به جدید
+    # مرتب‌سازی
     # ========================================================
 
     all_new_news.sort(
@@ -1842,30 +1991,15 @@ def process_rss_news(bot, sent):
     )
 
     # ========================================================
-    # محدودیت تعداد
+    # ارسال حداکثر ۱۰ خبر
     # ========================================================
 
     news_to_send = all_new_news[
         :MAX_NEWS_PER_RUN
     ]
 
-    skipped_count = (
-        len(all_new_news)
-        - len(news_to_send)
-    )
-
-    if skipped_count > 0:
-
-        print(
-            "⏸️ NEWS LEFT FOR NEXT RUN:",
-            skipped_count
-        )
-
-    # ========================================================
-    # ارسال
-    # ========================================================
-
     sent_count = 0
+    last_success_timestamp = None
 
     for news in news_to_send:
 
@@ -1876,15 +2010,70 @@ def process_rss_news(bot, sent):
         )
 
         if success:
+
             sent_count += 1
+
+            timestamp = get_news_timestamp(
+                news
+            )
+
+            if timestamp:
+                last_success_timestamp = timestamp
+
+            # ذخیره بعد از هر ارسال موفق
+            save_sent_news(sent)
+
+        else:
+
+            print(
+                "⚠️ SEND FAILED:",
+                news["title"]
+            )
 
         time.sleep(1)
 
     # ========================================================
-    # ذخیره زمان
+    # ذخیره آخرین زمان
     # ========================================================
 
-    save_last_run(current_time)
+    if last_success_timestamp is not None:
+
+        # مهم:
+        # زمان را current_time نمی‌گذاریم.
+        # چون ممکن است بیشتر از ۱۰ خبر وجود داشته باشد.
+        # در این حالت خبرهای باقی‌مانده برای اجرای بعدی حفظ می‌شوند.
+
+        save_last_run(
+            last_success_timestamp
+        )
+
+    elif not all_new_news:
+
+        # وقتی خبری وجود ندارد،
+        # زمان فعلی ثبت می‌شود.
+
+        save_last_run(
+            current_time
+        )
+
+    else:
+
+        # اگر خبر وجود داشته ولی ارسال هیچ‌کدام موفق نشده،
+        # last_run تغییر نمی‌کند تا خبرها از دست نروند.
+
+        print(
+            "⚠️ NO SUCCESSFUL SEND"
+        )
+
+        print(
+            "➡️ LAST RUN WAS NOT ADVANCED"
+        )
+
+    # ========================================================
+    # ذخیره دیتابیس
+    # ========================================================
+
+    save_sent_news(sent)
 
     print()
     print(
@@ -1898,6 +2087,11 @@ def process_rss_news(bot, sent):
     print(
         "NEWS SENT:",
         sent_count
+    )
+
+    print(
+        "SENT DATABASE COUNT:",
+        len(sent)
     )
 
     print(
