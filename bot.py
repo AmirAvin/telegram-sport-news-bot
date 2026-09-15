@@ -887,6 +887,10 @@ def clean_telegram_text(text):
         text
     )
 
+    # --------------------------------------------------------
+    # حذف لینک‌ها
+    # --------------------------------------------------------
+
     text = re.sub(
         r"https?://\S+",
         "",
@@ -908,12 +912,68 @@ def clean_telegram_text(text):
         flags=re.IGNORECASE
     )
 
+    # --------------------------------------------------------
+    # حذف آیدی کانال فوتبال ۳۶۰
+    # --------------------------------------------------------
+
     text = re.sub(
         r"@ft360_ir\b",
         "",
         text,
         flags=re.IGNORECASE
     )
+
+    # --------------------------------------------------------
+    # حذف تبلیغ:
+    # هم‌اکنون در سایت و یوتوب فوتبال ۳۶۰
+    # هم اکنون در سایت و یوتیوب فوتبال ۳۶۰
+    # و حالت‌های مشابه
+    # --------------------------------------------------------
+
+    text = re.sub(
+        r"🔗?\s*"
+        r"هم\s*(?:‌|\s)?اکنون"
+        r"\s+در\s+"
+        r"(?:سایت|وب‌سایت|وب سایت)"
+        r"\s+و\s+"
+        r"(?:یوتوب|یوتیوب)"
+        r"\s+فوتبال\s*۳۶۰",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    text = re.sub(
+        r"🔗?\s*"
+        r"(?:در\s+)?"
+        r"(?:سایت|وب‌سایت|وب سایت)"
+        r"\s+و\s+"
+        r"(?:یوتوب|یوتیوب)"
+        r"\s+فوتبال\s*۳۶۰",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # حالت‌هایی مثل:
+    # هم‌اکنون در سایت و یوتیوب فوتبال 360
+    # هم اکنون در سایت و یوتوب فوتبال360
+    text = re.sub(
+        r"🔗?\s*"
+        r"هم\s*(?:‌|\s)?اکنون"
+        r"\s+در\s+"
+        r"(?:سایت|وب‌سایت|وب سایت)"
+        r"\s+و\s+"
+        r"(?:یوتوب|یوتیوب)"
+        r"\s+فوتبال\s*[۳3]\s*۶\s*۰",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # --------------------------------------------------------
+    # تمیز کردن فاصله‌ها و خطوط خالی
+    # --------------------------------------------------------
 
     text = re.sub(
         r"[ \t]+",
@@ -922,7 +982,7 @@ def clean_telegram_text(text):
     )
 
     text = re.sub(
-        r"\n{3,}",
+        r"\n[ \t]*\n[ \t]*\n+",
         "\n\n",
         text
     )
@@ -1650,9 +1710,6 @@ def process_rss_news(bot, sent):
             "NO RSS LAST RUN FOUND"
         )
 
-        # Baseline only.
-        # Old news will NOT be published.
-
         if all_news:
 
             newest = max(
@@ -1664,11 +1721,14 @@ def process_rss_news(bot, sent):
             )
 
             if newest > 0:
+
                 save_timestamp(
                     LAST_RUN_FILE,
                     newest
                 )
+
             else:
+
                 save_timestamp(
                     LAST_RUN_FILE,
                     now
@@ -1720,13 +1780,15 @@ def process_rss_news(bot, sent):
         new_news
     )
 
-    # Newest first
+    # --------------------------------------------------------
+    # OLDEST FIRST
+    # --------------------------------------------------------
+
     new_news.sort(
         key=lambda x: x.get(
             "timestamp",
             0
-        ),
-        reverse=True
+        )
     )
 
     print(
@@ -1744,6 +1806,12 @@ def process_rss_news(bot, sent):
         return
 
     sent_count = 0
+    last_success_timestamp = last_run
+    send_failed = False
+
+    # --------------------------------------------------------
+    # SEND MAX 10
+    # --------------------------------------------------------
 
     for news in new_news[
         :MAX_NEWS_PER_RUN
@@ -1766,8 +1834,21 @@ def process_rss_news(bot, sent):
 
             sent_count += 1
 
+            timestamp = news.get(
+                "timestamp",
+                0
+            )
+
+            if timestamp > last_success_timestamp:
+                last_success_timestamp = timestamp
+
             save_sent(
                 sent
+            )
+
+            save_timestamp(
+                LAST_RUN_FILE,
+                last_success_timestamp
             )
 
             print(
@@ -1782,15 +1863,40 @@ def process_rss_news(bot, sent):
                 "RSS SEND FAILED"
             )
 
-    # Important:
-    # Move last_run to NOW only after processing.
-    # This prevents the same news from being permanently lost
-    # if Telegram has an error.
+            send_failed = True
 
-    save_timestamp(
-        LAST_RUN_FILE,
-        now
-    )
+            # مهم:
+            # اگر یک خبر ارسال نشد، دیگر جلو نمی‌رویم.
+            # اجرای بعدی از همین خبر ادامه می‌دهد.
+            break
+
+    # --------------------------------------------------------
+    # IF EVERYTHING WAS SENT
+    # --------------------------------------------------------
+
+    if not send_failed:
+
+        if sent_count < MAX_NEWS_PER_RUN:
+
+            # همه خبرهای جدید ارسال شده‌اند.
+            newest_timestamp = max(
+                n.get(
+                    "timestamp",
+                    0
+                )
+                for n in new_news
+            )
+
+            if newest_timestamp > last_success_timestamp:
+
+                last_success_timestamp = (
+                    newest_timestamp
+                )
+
+        save_timestamp(
+            LAST_RUN_FILE,
+            last_success_timestamp
+        )
 
     save_sent(
         sent
@@ -1799,6 +1905,11 @@ def process_rss_news(bot, sent):
     print(
         "RSS SENT:",
         sent_count
+    )
+
+    print(
+        "RSS LAST RUN:",
+        last_success_timestamp
     )
 
 
@@ -1925,12 +2036,15 @@ def process_telegram_news(bot, sent):
         new_news
     )
 
+    # --------------------------------------------------------
+    # OLDEST FIRST
+    # --------------------------------------------------------
+
     new_news.sort(
         key=lambda x: x.get(
             "timestamp",
             0
-        ),
-        reverse=True
+        )
     )
 
     print(
@@ -1948,6 +2062,12 @@ def process_telegram_news(bot, sent):
         return
 
     sent_count = 0
+    last_success_timestamp = last_run
+    send_failed = False
+
+    # --------------------------------------------------------
+    # SEND MAX 10
+    # --------------------------------------------------------
 
     for news in new_news[
         :MAX_NEWS_PER_RUN
@@ -1970,8 +2090,21 @@ def process_telegram_news(bot, sent):
 
             sent_count += 1
 
+            timestamp = news.get(
+                "timestamp",
+                0
+            )
+
+            if timestamp > last_success_timestamp:
+                last_success_timestamp = timestamp
+
             save_sent(
                 sent
+            )
+
+            save_timestamp(
+                TELEGRAM_LAST_RUN_FILE,
+                last_success_timestamp
             )
 
             print(
@@ -1986,10 +2119,37 @@ def process_telegram_news(bot, sent):
                 "TELEGRAM SEND FAILED"
             )
 
-    save_timestamp(
-        TELEGRAM_LAST_RUN_FILE,
-        now
-    )
+            send_failed = True
+
+            # اجرای بعدی از همین خبر ادامه می‌دهد.
+            break
+
+    # --------------------------------------------------------
+    # IF EVERYTHING WAS SENT
+    # --------------------------------------------------------
+
+    if not send_failed:
+
+        if sent_count < MAX_NEWS_PER_RUN:
+
+            newest_timestamp = max(
+                n.get(
+                    "timestamp",
+                    0
+                )
+                for n in new_news
+            )
+
+            if newest_timestamp > last_success_timestamp:
+
+                last_success_timestamp = (
+                    newest_timestamp
+                )
+
+        save_timestamp(
+            TELEGRAM_LAST_RUN_FILE,
+            last_success_timestamp
+        )
 
     save_sent(
         sent
@@ -1998,6 +2158,11 @@ def process_telegram_news(bot, sent):
     print(
         "TELEGRAM SENT:",
         sent_count
+    )
+
+    print(
+        "TELEGRAM LAST RUN:",
+        last_success_timestamp
     )
 
 
