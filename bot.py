@@ -232,18 +232,35 @@ HASHTAG_MAP = {
     "گل گهر": "#گل_گهر",
     "گل‌گهر": "#گل_گهر",
     "فولاد": "#فولاد",
+    "آلومینیوم": "#آلومینیوم",
+    "مس رفسنجان": "#مس_رفسنجان",
+    "مس کرمان": "#مس_کرمان",
+    "شمس آذر": "#شمس_آذر",
+    "خیبر": "#خیبر",
+    "هوادار": "#هوادار",
+    "چادرملو": "#چادرملو",
+    "نساجی": "#نساجی",
+    "پیکان": "#پیکان",
     "لیگ برتر": "#لیگ_برتر",
     "لیگ یک": "#لیگ_یک",
+    "لیگ آزادگان": "#لیگ_آزادگان",
     "جام حذفی": "#جام_حذفی",
+    "جام جهانی": "#جام_جهانی",
+    "لیگ قهرمانان": "#لیگ_قهرمانان",
+    "لیگ اروپا": "#لیگ_اروپا",
+    "لیگ کنفرانس": "#لیگ_کنفرانس",
     "تیم ملی": "#تیم_ملی",
     "تیم‌ملی": "#تیم_ملی",
+
     "رئال مادرید": "#رئال_مادرید",
     "بارسلونا": "#بارسلونا",
+    "اتلتیکو": "#اتلتیکو",
     "منچستریونایتد": "#منچستریونایتد",
     "منچسترسیتی": "#منچسترسیتی",
     "لیورپول": "#لیورپول",
     "آرسنال": "#آرسنال",
     "چلسی": "#چلسی",
+    "تاتنهام": "#تاتنهام",
     "بایرن": "#بایرن",
     "دورتموند": "#دورتموند",
     "یوونتوس": "#یوونتوس",
@@ -251,6 +268,10 @@ HASHTAG_MAP = {
     "میلان": "#میلان",
     "پاری سن ژرمن": "#پاری_سن_ژرمن",
     "پاری‌سن‌ژرمن": "#پاری_سن_ژرمن",
+    "ناپولی": "#ناپولی",
+    "رم": "#رم",
+    "لاتزیو": "#لاتزیو",
+
     "طارمی": "#طارمی",
     "آزمون": "#آزمون",
     "قلی زاده": "#قلی_زاده",
@@ -264,6 +285,9 @@ HASHTAG_MAP = {
     "امباپه": "#امباپه",
     "هالند": "#هالند",
     "نیمار": "#نیمار",
+    "صلاح": "#صلاح",
+    "وینیسیوس": "#وینیسیوس",
+    "بلینگام": "#بلینگام",
 }
 
 
@@ -406,21 +430,73 @@ def is_telegram_football_post(text):
 # ============================================================
 
 def create_hashtags(title, summary=""):
-    text = f"{title} {summary}"
-    normalized = normalize_title(text)
+    text = normalize_title(
+        f"{title} {summary}"
+    )
 
     result = []
 
+    # --------------------------------------------------------
+    # هشتگ اصلی فوتبال
+    # --------------------------------------------------------
+
+    if "#فوتبال" not in result:
+        result.append("#فوتبال")
+
+    # --------------------------------------------------------
+    # هشتگ‌های مشخص
+    # --------------------------------------------------------
+
     for keyword, hashtag in HASHTAG_MAP.items():
-        if normalize_title(keyword) in normalized:
+
+        keyword_normalized = normalize_title(
+            keyword
+        )
+
+        if keyword_normalized in text:
+
             if hashtag not in result:
                 result.append(hashtag)
 
-    if "فوتبال" in normalized:
-        if "#فوتبال" not in result:
-            result.insert(0, "#فوتبال")
+    # --------------------------------------------------------
+    # هشتگ‌های عمومی
+    # --------------------------------------------------------
 
-    return " ".join(result[:6])
+    extra_hashtags = [
+        ("پنالتی", "#پنالتی"),
+        ("داوری", "#داوری"),
+        ("داور", "#داوری"),
+        ("کارت قرمز", "#کارت_قرمز"),
+        ("کارت زرد", "#کارت_زرد"),
+        ("گل", "#گل"),
+        ("گلزنی", "#گلزنی"),
+        ("مربی", "#مربی"),
+        ("سرمربی", "#سرمربی"),
+        ("بازیکن", "#بازیکن"),
+        ("مهاجم", "#مهاجم"),
+        ("مدافع", "#مدافع"),
+        ("انتقال", "#نقل_و_انتقالات"),
+        ("نقل و انتقالات", "#نقل_و_انتقالات"),
+        ("قرارداد", "#قرارداد"),
+        ("آسیب", "#مصدومیت"),
+        ("مصدوم", "#مصدومیت"),
+        ("VAR", "#VAR"),
+    ]
+
+    for keyword, hashtag in extra_hashtags:
+
+        if normalize_title(keyword) in text:
+
+            if hashtag not in result:
+                result.append(hashtag)
+
+    # --------------------------------------------------------
+    # حداکثر 6 هشتگ
+    # --------------------------------------------------------
+
+    return " ".join(
+        result[:6]
+    )
 
 
 # ============================================================
@@ -609,6 +685,7 @@ def get_entry_image(entry):
 
         if media_content:
             for media in media_content:
+
                 url = media.get("url")
 
                 if url:
@@ -621,6 +698,7 @@ def get_entry_image(entry):
 
         if media_thumbnail:
             for media in media_thumbnail:
+
                 url = media.get("url")
 
                 if url:
@@ -632,12 +710,14 @@ def get_entry_image(entry):
         )
 
         for enclosure in enclosures:
+
             url = (
                 enclosure.get("href")
                 or enclosure.get("url")
             )
 
             if url:
+
                 media_type = enclosure.get(
                     "type",
                     ""
@@ -671,7 +751,9 @@ def get_entry_image(entry):
 
 def get_news_timestamp(entry):
     try:
+
         if entry.get("published_parsed"):
+
             return calendar.timegm(
                 entry.published_parsed
             )
@@ -680,7 +762,9 @@ def get_news_timestamp(entry):
         pass
 
     try:
+
         if entry.get("updated_parsed"):
+
             return calendar.timegm(
                 entry.updated_parsed
             )
@@ -693,6 +777,7 @@ def get_news_timestamp(entry):
 
 def fetch_rss(source):
     try:
+
         response = requests.get(
             source,
             headers={
@@ -755,6 +840,7 @@ def fetch_rss(source):
         return results
 
     except Exception as e:
+
         print(
             "RSS ERROR:",
             source,
@@ -766,6 +852,7 @@ def fetch_rss(source):
 
 def get_article_text(url):
     try:
+
         response = requests.get(
             url,
             headers={
@@ -789,6 +876,7 @@ def get_article_text(url):
             "header",
             "aside"
         ]):
+
             tag.decompose()
 
         candidates = soup.find_all([
@@ -797,11 +885,14 @@ def get_article_text(url):
         ])
 
         if candidates:
+
             text = candidates[0].get_text(
                 "\n",
                 strip=True
             )
+
         else:
+
             text = soup.get_text(
                 "\n",
                 strip=True
@@ -819,6 +910,7 @@ def get_article_text(url):
         )
 
     except Exception:
+
         return ""
 
 
@@ -831,6 +923,7 @@ def parse_telegram_datetime(value):
         return None
 
     try:
+
         value = value.strip()
 
         dt = datetime.fromisoformat(
@@ -848,6 +941,7 @@ def parse_telegram_datetime(value):
         return dt.timestamp()
 
     except Exception:
+
         return None
 
 
@@ -862,6 +956,7 @@ def extract_css_url(style):
     )
 
     if match:
+
         return html.unescape(
             match.group(1)
         )
@@ -913,7 +1008,7 @@ def clean_telegram_text(text):
     )
 
     # --------------------------------------------------------
-    # حذف آیدی کانال فوتبال ۳۶۰
+    # حذف آیدی فوتبال ۳۶۰
     # --------------------------------------------------------
 
     text = re.sub(
@@ -924,10 +1019,7 @@ def clean_telegram_text(text):
     )
 
     # --------------------------------------------------------
-    # حذف تبلیغ:
-    # هم‌اکنون در سایت و یوتوب فوتبال ۳۶۰
-    # هم اکنون در سایت و یوتیوب فوتبال ۳۶۰
-    # و حالت‌های مشابه
+    # حذف تبلیغ فوتبال ۳۶۰
     # --------------------------------------------------------
 
     text = re.sub(
@@ -955,9 +1047,6 @@ def clean_telegram_text(text):
         flags=re.IGNORECASE
     )
 
-    # حالت‌هایی مثل:
-    # هم‌اکنون در سایت و یوتیوب فوتبال 360
-    # هم اکنون در سایت و یوتوب فوتبال360
     text = re.sub(
         r"🔗?\s*"
         r"هم\s*(?:‌|\s)?اکنون"
@@ -972,7 +1061,48 @@ def clean_telegram_text(text):
     )
 
     # --------------------------------------------------------
-    # تمیز کردن فاصله‌ها و خطوط خالی
+    # حذف خطوط تبلیغاتی احتمالی دیگر
+    # --------------------------------------------------------
+
+    lines = []
+
+    for line in text.splitlines():
+
+        stripped = line.strip()
+
+        if not stripped:
+            continue
+
+        normalized_line = normalize_title(
+            stripped
+        )
+
+        if (
+            "هم اکنون در سایت" in normalized_line
+            and "یوت" in normalized_line
+            and "فوتبال" in normalized_line
+        ):
+            continue
+
+        if (
+            "سایت و یوتوب فوتبال" in normalized_line
+            or "سایت و یوتیوب فوتبال" in normalized_line
+        ):
+            continue
+
+        if "@ft360_ir" in normalized_line:
+            continue
+
+        lines.append(
+            stripped
+        )
+
+    text = "\n".join(
+        lines
+    )
+
+    # --------------------------------------------------------
+    # تمیز کردن
     # --------------------------------------------------------
 
     text = re.sub(
@@ -1014,6 +1144,7 @@ def split_telegram_title(text):
     title = lines[0]
 
     if len(title) > 180:
+
         title = truncate(
             title,
             180
@@ -1021,7 +1152,10 @@ def split_telegram_title(text):
 
     body = text
 
-    if body.startswith(lines[0]):
+    if body.startswith(
+        lines[0]
+    ):
+
         body = body[
             len(lines[0]):
         ].strip()
@@ -1030,11 +1164,13 @@ def split_telegram_title(text):
 
 
 def get_telegram_channel_news(username):
+
     url = (
         f"https://t.me/s/{username}"
     )
 
     try:
+
         response = requests.get(
             url,
             headers={
@@ -1077,6 +1213,7 @@ def get_telegram_channel_news(username):
             timestamp = None
 
             if time_element:
+
                 timestamp = parse_telegram_datetime(
                     time_element.get(
                         "datetime",
@@ -1094,6 +1231,7 @@ def get_telegram_channel_news(username):
             raw_text = ""
 
             if text_element:
+
                 raw_text = str(
                     text_element
                 )
@@ -1123,6 +1261,7 @@ def get_telegram_channel_news(username):
                 )
 
                 if image_url:
+
                     media_type = "photo"
 
             elif video_element:
@@ -1148,6 +1287,7 @@ def get_telegram_channel_news(username):
                 media_type == "video"
                 and not text
             ):
+
                 title = "ویدئوی فوتبال ۳۶۰"
                 body = ""
 
@@ -1166,6 +1306,7 @@ def get_telegram_channel_news(username):
         return results
 
     except Exception as e:
+
         print(
             "TELEGRAM CHANNEL ERROR:",
             username,
@@ -1180,12 +1321,19 @@ def get_telegram_channel_news(username):
 # ============================================================
 
 def build_caption(news):
+
     title = clean_text(
-        news.get("title", "")
+        news.get(
+            "title",
+            ""
+        )
     )
 
     summary = clean_text(
-        news.get("summary", "")
+        news.get(
+            "summary",
+            ""
+        )
     )
 
     hashtags = create_hashtags(
@@ -1196,11 +1344,13 @@ def build_caption(news):
     parts = []
 
     if title:
+
         parts.append(
             f"<b>{html.escape(title)}</b>"
         )
 
     if summary:
+
         parts.append(
             html.escape(
                 truncate(
@@ -1211,6 +1361,7 @@ def build_caption(news):
         )
 
     if hashtags:
+
         parts.append(
             hashtags
         )
@@ -1226,12 +1377,19 @@ def build_caption(news):
 
 
 def build_text_message(news):
+
     title = clean_text(
-        news.get("title", "")
+        news.get(
+            "title",
+            ""
+        )
     )
 
     summary = clean_text(
-        news.get("summary", "")
+        news.get(
+            "summary",
+            ""
+        )
     )
 
     hashtags = create_hashtags(
@@ -1242,11 +1400,13 @@ def build_text_message(news):
     parts = []
 
     if title:
+
         parts.append(
             f"<b>{html.escape(title)}</b>"
         )
 
     if summary:
+
         parts.append(
             html.escape(
                 truncate(
@@ -1257,6 +1417,7 @@ def build_text_message(news):
         )
 
     if hashtags:
+
         parts.append(
             hashtags
         )
@@ -1273,7 +1434,9 @@ def build_text_message(news):
 # ============================================================
 
 def get_aparat_video(url, news):
+
     try:
+
         response = requests.get(
             url,
             headers={
@@ -1300,6 +1463,7 @@ def get_aparat_video(url, news):
             )
 
             if match:
+
                 return match.group(0)
 
     except Exception:
@@ -1313,7 +1477,9 @@ def get_aparat_video(url, news):
 # ============================================================
 
 def download_file(url, filename):
+
     try:
+
         response = requests.get(
             url,
             headers={
@@ -1340,6 +1506,7 @@ def download_file(url, filename):
         return True
 
     except Exception as e:
+
         print(
             "DOWNLOAD ERROR:",
             e
@@ -1654,6 +1821,7 @@ def deduplicate_news(news_list):
                 break
 
         if not duplicate:
+
             result.append(
                 news
             )
@@ -1840,6 +2008,7 @@ def process_rss_news(bot, sent):
             )
 
             if timestamp > last_success_timestamp:
+
                 last_success_timestamp = timestamp
 
             save_sent(
@@ -1865,9 +2034,6 @@ def process_rss_news(bot, sent):
 
             send_failed = True
 
-            # مهم:
-            # اگر یک خبر ارسال نشد، دیگر جلو نمی‌رویم.
-            # اجرای بعدی از همین خبر ادامه می‌دهد.
             break
 
     # --------------------------------------------------------
@@ -1878,7 +2044,6 @@ def process_rss_news(bot, sent):
 
         if sent_count < MAX_NEWS_PER_RUN:
 
-            # همه خبرهای جدید ارسال شده‌اند.
             newest_timestamp = max(
                 n.get(
                     "timestamp",
@@ -2096,6 +2261,7 @@ def process_telegram_news(bot, sent):
             )
 
             if timestamp > last_success_timestamp:
+
                 last_success_timestamp = timestamp
 
             save_sent(
@@ -2121,7 +2287,6 @@ def process_telegram_news(bot, sent):
 
             send_failed = True
 
-            # اجرای بعدی از همین خبر ادامه می‌دهد.
             break
 
     # --------------------------------------------------------
