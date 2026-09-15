@@ -2,48 +2,92 @@ name: Main Yamal
 
 on:
   workflow_dispatch:
-
   schedule:
     - cron: "*/30 * * * *"
 
 permissions:
   contents: write
 
+concurrency:
+  group: football-bot
+  cancel-in-progress: false
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - name: TEST
-        run: |
-          echo "================================"
-          echo "MAIN YAMAL IS RUNNING"
-          echo "================================"
-          echo "DATE:"
-          date
-          echo "PYTHON:"
-          python3 --version
-          echo "================================"
-
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check bot.py
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install requirements
         run: |
-          echo "================================"
-          echo "CHECKING BOT FILE"
-          echo "================================"
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-          pwd
-          echo "FILES:"
-          ls -la
+      - name: Run bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL: ${{ secrets.CHANNEL_ID }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -o pipefail
 
-          echo "BOT.PY:"
-          ls -lh bot.py
+          echo "========================================"
+          echo "STARTING FOOTBALL BOT"
+          echo "========================================"
 
-          echo "PYTHON:"
-          python3 --version
+          python -u bot.py 2>&1 | tee bot.log
 
-          echo "================================"
-          echo "TEST FINISHED"
-          echo "================================"
+          echo "========================================"
+          echo "BOT PROCESS FINISHED"
+          echo "========================================"
+
+      - name: Show bot log
+        if: always()
+        run: |
+          echo "========================================"
+          echo "FULL BOT LOG"
+          echo "========================================"
+
+          if [ -f bot.log ]; then
+            cat bot.log
+          else
+            echo "bot.log was not created."
+          fi
+
+          echo "========================================"
+          echo "END BOT LOG"
+          echo "========================================"
+
+      - name: Save news database
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ -f sent_news.json ]; then
+            git add sent_news.json
+          fi
+
+          if [ -f last_run.json ]; then
+            git add last_run.json
+          fi
+
+          if [ -f telegram_last_run.json ]; then
+            git add telegram_last_run.json
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No database changes to commit."
+          else
+            git commit -m "Update news database"
+            git push
+          fi
