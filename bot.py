@@ -4,6 +4,7 @@ import json
 import html
 import time
 import hashlib
+import calendar
 import requests
 import feedparser
 import asyncio
@@ -149,7 +150,8 @@ FOOTBALL_KEYWORDS = [
     "پیروز قربانی",
     "نویدکیا",
     "تارتار",
-    "سهرا بختیاری زاده",
+    "سهراب بختیاری زاده",
+    "سهراب بختیاری‌زاده",
     "رئال مادرید",
     "بارسلونا",
     "اتلتیکو",
@@ -266,6 +268,23 @@ HASHTAG_MAP = {
 
 
 # ============================================================
+# TELEGRAM LOOP
+# ============================================================
+
+BOT_LOOP = None
+
+
+def run_async(coro):
+    global BOT_LOOP
+
+    if BOT_LOOP is None:
+        BOT_LOOP = asyncio.new_event_loop()
+        asyncio.set_event_loop(BOT_LOOP)
+
+    return BOT_LOOP.run_until_complete(coro)
+
+
+# ============================================================
 # BASIC HELPERS
 # ============================================================
 
@@ -285,8 +304,15 @@ def clean_text(text):
     if not text:
         return ""
 
-    soup = BeautifulSoup(str(text), "html.parser")
-    text = soup.get_text(" ", strip=True)
+    soup = BeautifulSoup(
+        str(text),
+        "html.parser"
+    )
+
+    text = soup.get_text(
+        " ",
+        strip=True
+    )
 
     text = html.unescape(text)
     text = text.replace("\u200c", " ")
@@ -338,7 +364,11 @@ def similarity(a, b):
     if not a or not b:
         return 0
 
-    return SequenceMatcher(None, a, b).ratio()
+    return SequenceMatcher(
+        None,
+        a,
+        b
+    ).ratio()
 
 
 # ============================================================
@@ -362,12 +392,6 @@ def is_football_news(title, summary=""):
 
 
 def is_telegram_football_post(text):
-    """
-    ft360_ir is a football channel.
-    We reject obvious non-football posts but don't require
-    a football keyword in every short post/video caption.
-    """
-
     normalized = normalize_title(text)
 
     for bad in NON_FOOTBALL_KEYWORDS:
@@ -383,15 +407,16 @@ def is_telegram_football_post(text):
 
 def create_hashtags(title, summary=""):
     text = f"{title} {summary}"
+    normalized = normalize_title(text)
 
     result = []
 
     for keyword, hashtag in HASHTAG_MAP.items():
-        if normalize_title(keyword) in normalize_title(text):
+        if normalize_title(keyword) in normalized:
             if hashtag not in result:
                 result.append(hashtag)
 
-    if "فوتبال" in normalize_title(text):
+    if "فوتبال" in normalized:
         if "#فوتبال" not in result:
             result.insert(0, "#فوتبال")
 
@@ -411,7 +436,11 @@ def load_sent():
         }
 
     try:
-        with open(SENT_FILE, "r", encoding="utf-8") as f:
+        with open(
+            SENT_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
             data = json.load(f)
 
         if not isinstance(data, dict):
@@ -433,20 +462,33 @@ def load_sent():
 
 def save_sent(data):
     try:
-        with open(SENT_FILE, "w", encoding="utf-8") as f:
+        with open(
+            SENT_FILE,
+            "w",
+            encoding="utf-8"
+        ) as f:
             json.dump(
                 data,
                 f,
                 ensure_ascii=False,
                 indent=2
             )
+
     except Exception as e:
-        print("SAVE SENT ERROR:", e)
+        print(
+            "SAVE SENT ERROR:",
+            e
+        )
 
 
 def make_news_key(news):
-    title = normalize_title(news.get("title", ""))
-    url = clean_url(news.get("link", ""))
+    title = normalize_title(
+        news.get("title", "")
+    )
+
+    url = clean_url(
+        news.get("link", "")
+    )
 
     return hashlib.sha256(
         f"{title}|{url}".encode("utf-8")
@@ -454,8 +496,14 @@ def make_news_key(news):
 
 
 def is_already_sent(news, sent):
-    url = clean_url(news.get("link", ""))
-    title_hash = fingerprint(news.get("title", ""))
+    url = clean_url(
+        news.get("link", "")
+    )
+
+    title_hash = fingerprint(
+        news.get("title", "")
+    )
+
     key = make_news_key(news)
 
     if url and url in sent["urls"]:
@@ -471,20 +519,30 @@ def is_already_sent(news, sent):
 
 
 def register_sent(news, sent):
-    url = clean_url(news.get("link", ""))
-    title_hash = fingerprint(news.get("title", ""))
+    url = clean_url(
+        news.get("link", "")
+    )
+
+    title_hash = fingerprint(
+        news.get("title", "")
+    )
+
     key = make_news_key(news)
 
     if url and url not in sent["urls"]:
         sent["urls"].append(url)
 
-    if title_hash and title_hash not in sent["titles"]:
-        sent["titles"].append(title_hash)
+    if (
+        title_hash
+        and title_hash not in sent["titles"]
+    ):
+        sent["titles"].append(
+            title_hash
+        )
 
     if key not in sent["keys"]:
         sent["keys"].append(key)
 
-    # Prevent unlimited growth
     sent["urls"] = sent["urls"][-5000:]
     sent["titles"] = sent["titles"][-5000:]
     sent["keys"] = sent["keys"][-5000:]
@@ -499,10 +557,19 @@ def load_timestamp(filename):
         return None
 
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(
+            filename,
+            "r",
+            encoding="utf-8"
+        ) as f:
             data = json.load(f)
 
-        return float(data.get("timestamp"))
+        value = data.get("timestamp")
+
+        if value is None:
+            return None
+
+        return float(value)
 
     except Exception:
         return None
@@ -510,13 +577,23 @@ def load_timestamp(filename):
 
 def save_timestamp(filename, timestamp):
     try:
-        with open(filename, "w", encoding="utf-8") as f:
+        with open(
+            filename,
+            "w",
+            encoding="utf-8"
+        ) as f:
             json.dump(
-                {"timestamp": float(timestamp)},
+                {
+                    "timestamp": float(timestamp)
+                },
                 f
             )
+
     except Exception as e:
-        print("SAVE TIMESTAMP ERROR:", e)
+        print(
+            "SAVE TIMESTAMP ERROR:",
+            e
+        )
 
 
 # ============================================================
@@ -525,7 +602,10 @@ def save_timestamp(filename, timestamp):
 
 def get_entry_image(entry):
     try:
-        media_content = entry.get("media_content", [])
+        media_content = entry.get(
+            "media_content",
+            []
+        )
 
         if media_content:
             for media in media_content:
@@ -534,7 +614,10 @@ def get_entry_image(entry):
                 if url:
                     return url
 
-        media_thumbnail = entry.get("media_thumbnail", [])
+        media_thumbnail = entry.get(
+            "media_thumbnail",
+            []
+        )
 
         if media_thumbnail:
             for media in media_thumbnail:
@@ -543,18 +626,32 @@ def get_entry_image(entry):
                 if url:
                     return url
 
-        enclosures = entry.get("enclosures", [])
+        enclosures = entry.get(
+            "enclosures",
+            []
+        )
 
         for enclosure in enclosures:
-            url = enclosure.get("href") or enclosure.get("url")
+            url = (
+                enclosure.get("href")
+                or enclosure.get("url")
+            )
 
             if url:
-                media_type = enclosure.get("type", "")
+                media_type = enclosure.get(
+                    "type",
+                    ""
+                )
 
-                if media_type.startswith("image/"):
+                if media_type.startswith(
+                    "image/"
+                ):
                     return url
 
-        summary = entry.get("summary", "")
+        summary = entry.get(
+            "summary",
+            ""
+        )
 
         soup = BeautifulSoup(
             summary,
@@ -578,6 +675,7 @@ def get_news_timestamp(entry):
             return calendar.timegm(
                 entry.published_parsed
             )
+
     except Exception:
         pass
 
@@ -586,10 +684,11 @@ def get_news_timestamp(entry):
             return calendar.timegm(
                 entry.updated_parsed
             )
+
     except Exception:
         pass
 
-    return time.time()
+    return 0
 
 
 def fetch_rss(source):
@@ -611,15 +710,25 @@ def fetch_rss(source):
         results = []
 
         for entry in feed.entries:
+
             title = clean_text(
-                entry.get("title", "")
+                entry.get(
+                    "title",
+                    ""
+                )
             )
 
             summary = clean_text(
-                entry.get("summary", "")
+                entry.get(
+                    "summary",
+                    ""
+                )
             )
 
-            link = entry.get("link", "")
+            link = entry.get(
+                "link",
+                ""
+            )
 
             if not title or not link:
                 continue
@@ -630,11 +739,15 @@ def fetch_rss(source):
             ):
                 continue
 
+            timestamp = get_news_timestamp(
+                entry
+            )
+
             results.append({
                 "title": title,
                 "summary": summary,
                 "link": link,
-                "timestamp": get_news_timestamp(entry),
+                "timestamp": timestamp,
                 "image_url": get_entry_image(entry),
                 "source": "rss",
             })
@@ -721,7 +834,10 @@ def parse_telegram_datetime(value):
         value = value.strip()
 
         dt = datetime.fromisoformat(
-            value.replace("Z", "+00:00")
+            value.replace(
+                "Z",
+                "+00:00"
+            )
         )
 
         if dt.tzinfo is None:
@@ -767,9 +883,10 @@ def clean_telegram_text(text):
         strip=True
     )
 
-    text = html.unescape(text)
+    text = html.unescape(
+        text
+    )
 
-    # Remove URLs from copied Telegram text
     text = re.sub(
         r"https?://\S+",
         "",
@@ -791,7 +908,6 @@ def clean_telegram_text(text):
         flags=re.IGNORECASE
     )
 
-    # Remove source channel handle
     text = re.sub(
         r"@ft360_ir\b",
         "",
@@ -846,13 +962,17 @@ def split_telegram_title(text):
     body = text
 
     if body.startswith(lines[0]):
-        body = body[len(lines[0]):].strip()
+        body = body[
+            len(lines[0]):
+        ].strip()
 
     return title, body
 
 
 def get_telegram_channel_news(username):
-    url = f"https://t.me/s/{username}"
+    url = (
+        f"https://t.me/s/{username}"
+    )
 
     try:
         response = requests.get(
@@ -877,6 +997,7 @@ def get_telegram_channel_news(username):
         results = []
 
         for message in messages:
+
             date_element = message.select_one(
                 "a.tgme_widget_message_date"
             )
@@ -933,6 +1054,7 @@ def get_telegram_channel_news(username):
             media_type = "none"
 
             if photo_element:
+
                 image_url = extract_css_url(
                     photo_element.get(
                         "style",
@@ -944,23 +1066,28 @@ def get_telegram_channel_news(username):
                     media_type = "photo"
 
             elif video_element:
-                # Telegram public preview does not give us
-                # a reliable direct MP4 file.
-                # Therefore we DO NOT send the video thumbnail
-                # as if it were the video.
+
                 media_type = "video"
 
-            if not text and media_type == "none":
+            if (
+                not text
+                and media_type == "none"
+            ):
                 continue
 
-            if not is_telegram_football_post(text):
+            if not is_telegram_football_post(
+                text
+            ):
                 continue
 
             title, body = split_telegram_title(
                 text
             )
 
-            if media_type == "video" and not text:
+            if (
+                media_type == "video"
+                and not text
+            ):
                 title = "ویدئوی فوتبال ۳۶۰"
                 body = ""
 
@@ -1016,7 +1143,10 @@ def build_caption(news):
     if summary:
         parts.append(
             html.escape(
-                truncate(summary, 750)
+                truncate(
+                    summary,
+                    750
+                )
             )
         )
 
@@ -1029,12 +1159,8 @@ def build_caption(news):
         "@ligebartar24"
     )
 
-    caption = "\n\n".join(
-        parts
-    )
-
     return truncate(
-        caption,
+        "\n\n".join(parts),
         1024
     )
 
@@ -1063,7 +1189,10 @@ def build_text_message(news):
     if summary:
         parts.append(
             html.escape(
-                truncate(summary, 3000)
+                truncate(
+                    summary,
+                    3000
+                )
             )
         )
 
@@ -1080,23 +1209,22 @@ def build_text_message(news):
 
 
 # ============================================================
-# APARAT VIDEO
+# APARAT
 # ============================================================
 
 def get_aparat_video(url, news):
-    """
-    Try to find an Aparat video.
-    If unavailable, return None.
-    """
-
     try:
-        text = requests.get(
+        response = requests.get(
             url,
             headers={
                 "User-Agent": USER_AGENT
             },
             timeout=20
-        ).text
+        )
+
+        response.raise_for_status()
+
+        text = response.text
 
         patterns = [
             r'https?://www\.aparat\.com/v/[^"\']+',
@@ -1104,6 +1232,7 @@ def get_aparat_video(url, news):
         ]
 
         for pattern in patterns:
+
             match = re.search(
                 pattern,
                 text,
@@ -1136,10 +1265,15 @@ def download_file(url, filename):
 
         response.raise_for_status()
 
-        with open(filename, "wb") as f:
+        with open(
+            filename,
+            "wb"
+        ) as f:
+
             for chunk in response.iter_content(
                 chunk_size=8192
             ):
+
                 if chunk:
                     f.write(chunk)
 
@@ -1158,23 +1292,10 @@ def download_file(url, filename):
 # SEND NEWS
 # ============================================================
 
-def run_async(coro):
-    try:
-        return asyncio.run(coro)
-
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-
-        try:
-            return loop.run_until_complete(
-                coro
-            )
-        finally:
-            loop.close()
-
-
 def send_news(bot, news, sent):
+
     try:
+
         caption = build_caption(
             news
         )
@@ -1201,12 +1322,16 @@ def send_news(bot, news, sent):
                 image_url
                 and media_type == "photo"
             ):
-                filename = "telegram_photo.jpg"
+
+                filename = (
+                    "telegram_photo.jpg"
+                )
 
                 if download_file(
                     image_url,
                     filename
                 ):
+
                     with open(
                         filename,
                         "rb"
@@ -1222,11 +1347,14 @@ def send_news(bot, news, sent):
                         )
 
                     try:
-                        os.remove(filename)
+                        os.remove(
+                            filename
+                        )
                     except Exception:
                         pass
 
                 else:
+
                     run_async(
                         bot.send_message(
                             chat_id=CHANNEL,
@@ -1236,9 +1364,6 @@ def send_news(bot, news, sent):
                     )
 
             else:
-                # Important:
-                # A Telegram preview video is NOT treated as a photo.
-                # Until we have a real MP4 URL, send text only.
 
                 run_async(
                     bot.send_message(
@@ -1260,11 +1385,17 @@ def send_news(bot, news, sent):
         # ----------------------------------------------------
 
         article_text = get_article_text(
-            news.get("link", "")
+            news.get(
+                "link",
+                ""
+            )
         )
 
         if article_text:
-            news_for_caption = dict(news)
+
+            news_for_caption = dict(
+                news
+            )
 
             news_for_caption["summary"] = (
                 article_text
@@ -1278,25 +1409,37 @@ def send_news(bot, news, sent):
                 news_for_caption
             )
 
-        # Try Aparat video only for RSS pages
+        # ----------------------------------------------------
+        # APARAT VIDEO
+        # ----------------------------------------------------
+
         video_url = get_aparat_video(
-            news.get("link", ""),
+            news.get(
+                "link",
+                ""
+            ),
             news
         )
 
         if video_url:
-            # We only send it if it is an actual downloadable
-            # video file. Otherwise don't pretend it is a video.
 
             if video_url.endswith(
-                (".mp4", ".m4v", ".webm")
+                (
+                    ".mp4",
+                    ".m4v",
+                    ".webm"
+                )
             ):
-                filename = "temp_video.mp4"
+
+                filename = (
+                    "temp_video.mp4"
+                )
 
                 if download_file(
                     video_url,
                     filename
                 ):
+
                     with open(
                         filename,
                         "rb"
@@ -1312,7 +1455,9 @@ def send_news(bot, news, sent):
                         )
 
                     try:
-                        os.remove(filename)
+                        os.remove(
+                            filename
+                        )
                     except Exception:
                         pass
 
@@ -1323,18 +1468,25 @@ def send_news(bot, news, sent):
 
                     return True
 
-        # Photo
+        # ----------------------------------------------------
+        # PHOTO
+        # ----------------------------------------------------
+
         image_url = news.get(
             "image_url"
         )
 
         if image_url:
-            filename = "temp_photo.jpg"
+
+            filename = (
+                "temp_photo.jpg"
+            )
 
             if download_file(
                 image_url,
                 filename
             ):
+
                 with open(
                     filename,
                     "rb"
@@ -1350,7 +1502,9 @@ def send_news(bot, news, sent):
                     )
 
                 try:
-                    os.remove(filename)
+                    os.remove(
+                        filename
+                    )
                 except Exception:
                     pass
 
@@ -1361,7 +1515,10 @@ def send_news(bot, news, sent):
 
                 return True
 
-        # Text
+        # ----------------------------------------------------
+        # TEXT
+        # ----------------------------------------------------
+
         run_async(
             bot.send_message(
                 chat_id=CHANNEL,
@@ -1378,9 +1535,10 @@ def send_news(bot, news, sent):
         return True
 
     except Exception as e:
+
         print(
             "SEND NEWS ERROR:",
-            e
+            repr(e)
         )
 
         return False
@@ -1391,6 +1549,7 @@ def send_news(bot, news, sent):
 # ============================================================
 
 def deduplicate_news(news_list):
+
     result = []
 
     for news in sorted(
@@ -1400,27 +1559,44 @@ def deduplicate_news(news_list):
             0
         )
     ):
+
         duplicate = False
 
         for existing in result:
 
             if clean_url(
-                news.get("link", "")
+                news.get(
+                    "link",
+                    ""
+                )
             ) == clean_url(
-                existing.get("link", "")
+                existing.get(
+                    "link",
+                    ""
+                )
             ):
+
                 duplicate = True
                 break
 
             if similarity(
-                news.get("title", ""),
-                existing.get("title", "")
+                news.get(
+                    "title",
+                    ""
+                ),
+                existing.get(
+                    "title",
+                    ""
+                )
             ) >= 0.88:
+
                 duplicate = True
                 break
 
         if not duplicate:
-            result.append(news)
+            result.append(
+                news
+            )
 
     return result
 
@@ -1430,6 +1606,7 @@ def deduplicate_news(news_list):
 # ============================================================
 
 def process_rss_news(bot, sent):
+
     print("")
     print("=" * 40)
     print("STARTING RSS")
@@ -1444,6 +1621,7 @@ def process_rss_news(bot, sent):
     all_news = []
 
     for source in RSS_SOURCES:
+
         print(
             "RSS:",
             source
@@ -1462,20 +1640,42 @@ def process_rss_news(bot, sent):
         len(all_news)
     )
 
-    # First run:
-    # establish baseline and don't publish old news.
+    # --------------------------------------------------------
+    # FIRST RUN
+    # --------------------------------------------------------
+
     if last_run is None:
+
+        print(
+            "NO RSS LAST RUN FOUND"
+        )
+
+        # Baseline only.
+        # Old news will NOT be published.
+
         if all_news:
+
             newest = max(
-                n.get("timestamp", now)
+                n.get(
+                    "timestamp",
+                    0
+                )
                 for n in all_news
             )
 
-            save_timestamp(
-                LAST_RUN_FILE,
-                max(now, newest)
-            )
+            if newest > 0:
+                save_timestamp(
+                    LAST_RUN_FILE,
+                    newest
+                )
+            else:
+                save_timestamp(
+                    LAST_RUN_FILE,
+                    now
+                )
+
         else:
+
             save_timestamp(
                 LAST_RUN_FILE,
                 now
@@ -1487,6 +1687,10 @@ def process_rss_news(bot, sent):
 
         return
 
+    # --------------------------------------------------------
+    # FIND NEW NEWS
+    # --------------------------------------------------------
+
     new_news = []
 
     for news in all_news:
@@ -1495,6 +1699,9 @@ def process_rss_news(bot, sent):
             "timestamp",
             0
         )
+
+        if timestamp <= 0:
+            continue
 
         if timestamp <= last_run:
             continue
@@ -1513,12 +1720,22 @@ def process_rss_news(bot, sent):
         new_news
     )
 
+    # Newest first
+    new_news.sort(
+        key=lambda x: x.get(
+            "timestamp",
+            0
+        ),
+        reverse=True
+    )
+
     print(
         "NEW RSS NEWS:",
         len(new_news)
     )
 
     if not new_news:
+
         save_timestamp(
             LAST_RUN_FILE,
             now
@@ -1527,13 +1744,16 @@ def process_rss_news(bot, sent):
         return
 
     sent_count = 0
-    last_success_timestamp = last_run
 
-    for news in new_news[:MAX_NEWS_PER_RUN]:
+    for news in new_news[
+        :MAX_NEWS_PER_RUN
+    ]:
 
         print(
             "SENDING RSS:",
-            news.get("title")
+            news.get(
+                "title"
+            )
         )
 
         success = send_news(
@@ -1543,32 +1763,34 @@ def process_rss_news(bot, sent):
         )
 
         if success:
-            sent_count += 1
 
-            last_success_timestamp = max(
-                last_success_timestamp,
-                news.get(
-                    "timestamp",
-                    last_success_timestamp
-                )
-            )
+            sent_count += 1
 
             save_sent(
                 sent
             )
 
-            time.sleep(1)
+            print(
+                "RSS SENT OK"
+            )
+
+            time.sleep(2)
 
         else:
+
             print(
                 "RSS SEND FAILED"
             )
 
-    if sent_count > 0:
-        save_timestamp(
-            LAST_RUN_FILE,
-            last_success_timestamp
-        )
+    # Important:
+    # Move last_run to NOW only after processing.
+    # This prevents the same news from being permanently lost
+    # if Telegram has an error.
+
+    save_timestamp(
+        LAST_RUN_FILE,
+        now
+    )
 
     save_sent(
         sent
@@ -1585,6 +1807,7 @@ def process_rss_news(bot, sent):
 # ============================================================
 
 def process_telegram_news(bot, sent):
+
     print("")
     print("=" * 40)
     print("STARTING TELEGRAM CHANNELS")
@@ -1600,7 +1823,9 @@ def process_telegram_news(bot, sent):
 
     for channel in TELEGRAM_CHANNELS:
 
-        username = channel["username"]
+        username = channel[
+            "username"
+        ]
 
         print(
             "TELEGRAM CHANNEL:",
@@ -1620,25 +1845,42 @@ def process_telegram_news(bot, sent):
             len(news)
         )
 
-    # First Telegram run:
-    # DO NOT publish old posts.
+    # --------------------------------------------------------
+    # FIRST RUN
+    # --------------------------------------------------------
+
     if last_run is None:
 
+        print(
+            "NO TELEGRAM LAST RUN FOUND"
+        )
+
         if all_news:
+
             newest = max(
                 n.get(
                     "timestamp",
-                    now
+                    0
                 )
                 for n in all_news
             )
 
-            save_timestamp(
-                TELEGRAM_LAST_RUN_FILE,
-                max(now, newest)
-            )
+            if newest > 0:
+
+                save_timestamp(
+                    TELEGRAM_LAST_RUN_FILE,
+                    newest
+                )
+
+            else:
+
+                save_timestamp(
+                    TELEGRAM_LAST_RUN_FILE,
+                    now
+                )
 
         else:
+
             save_timestamp(
                 TELEGRAM_LAST_RUN_FILE,
                 now
@@ -1650,6 +1892,10 @@ def process_telegram_news(bot, sent):
 
         return
 
+    # --------------------------------------------------------
+    # FIND NEW TELEGRAM POSTS
+    # --------------------------------------------------------
+
     new_news = []
 
     for news in all_news:
@@ -1658,6 +1904,9 @@ def process_telegram_news(bot, sent):
             "timestamp",
             0
         )
+
+        if timestamp <= 0:
+            continue
 
         if timestamp <= last_run:
             continue
@@ -1676,12 +1925,21 @@ def process_telegram_news(bot, sent):
         new_news
     )
 
+    new_news.sort(
+        key=lambda x: x.get(
+            "timestamp",
+            0
+        ),
+        reverse=True
+    )
+
     print(
         "NEW TELEGRAM NEWS:",
         len(new_news)
     )
 
     if not new_news:
+
         save_timestamp(
             TELEGRAM_LAST_RUN_FILE,
             now
@@ -1691,13 +1949,15 @@ def process_telegram_news(bot, sent):
 
     sent_count = 0
 
-    last_success_timestamp = last_run
-
-    for news in new_news[:MAX_NEWS_PER_RUN]:
+    for news in new_news[
+        :MAX_NEWS_PER_RUN
+    ]:
 
         print(
             "SENDING TELEGRAM:",
-            news.get("title")
+            news.get(
+                "title"
+            )
         )
 
         success = send_news(
@@ -1707,33 +1967,29 @@ def process_telegram_news(bot, sent):
         )
 
         if success:
-            sent_count += 1
 
-            last_success_timestamp = max(
-                last_success_timestamp,
-                news.get(
-                    "timestamp",
-                    last_success_timestamp
-                )
-            )
+            sent_count += 1
 
             save_sent(
                 sent
             )
 
-            time.sleep(1)
+            print(
+                "TELEGRAM SENT OK"
+            )
+
+            time.sleep(2)
 
         else:
+
             print(
                 "TELEGRAM SEND FAILED"
             )
 
-    # Only move Telegram timestamp after successful sends.
-    if sent_count > 0:
-        save_timestamp(
-            TELEGRAM_LAST_RUN_FILE,
-            last_success_timestamp
-        )
+    save_timestamp(
+        TELEGRAM_LAST_RUN_FILE,
+        now
+    )
 
     save_sent(
         sent
@@ -1750,7 +2006,9 @@ def process_telegram_news(bot, sent):
 # ============================================================
 
 def check_api_football():
+
     if not API_FOOTBALL_KEY:
+
         print(
             "API FOOTBALL KEY NOT SET - RSS MODE"
         )
@@ -1758,6 +2016,7 @@ def check_api_football():
         return False
 
     try:
+
         response = requests.get(
             "https://v3.football.api-sports.io/status",
             headers={
@@ -1785,6 +2044,7 @@ def check_api_football():
         )
 
         if errors:
+
             print(
                 "API FOOTBALL UNAVAILABLE"
             )
@@ -1794,6 +2054,7 @@ def check_api_football():
         return True
 
     except Exception as e:
+
         print(
             "API FOOTBALL ERROR:",
             e
@@ -1808,6 +2069,8 @@ def check_api_football():
 
 def main():
 
+    global BOT_LOOP
+
     print("=" * 50)
     print("TELEGRAM SPORTS NEWS BOT")
     print("=" * 50)
@@ -1816,22 +2079,21 @@ def main():
     print("=" * 50)
 
     if not BOT_TOKEN:
+
         print(
             "ERROR: BOT_TOKEN IS NOT SET"
         )
 
         return
 
-    # API is optional.
-    # Even if suspended, RSS and Telegram continue.
     check_api_football()
 
     try:
+
         bot = Bot(
             token=BOT_TOKEN
         )
 
-        # Verify Telegram bot token
         me = run_async(
             bot.get_me()
         )
@@ -1842,9 +2104,10 @@ def main():
         )
 
     except Exception as e:
+
         print(
             "BOT CONNECTION ERROR:",
-            e
+            repr(e)
         )
 
         return
@@ -1867,11 +2130,45 @@ def main():
         sent
     )
 
+    # --------------------------------------------------------
+    # SHUTDOWN TELEGRAM CLEANLY
+    # --------------------------------------------------------
+
+    try:
+
+        if BOT_LOOP is not None:
+
+            BOT_LOOP.run_until_complete(
+                bot.shutdown()
+            )
+
+    except Exception as e:
+
+        print(
+            "BOT SHUTDOWN WARNING:",
+            repr(e)
+        )
+
+    finally:
+
+        if BOT_LOOP is not None:
+
+            try:
+                BOT_LOOP.close()
+            except Exception:
+                pass
+
+            BOT_LOOP = None
+
     print("")
     print("=" * 50)
     print("BOT FINISHED")
     print("=" * 50)
 
+
+# ============================================================
+# START
+# ============================================================
 
 if __name__ == "__main__":
     main()
