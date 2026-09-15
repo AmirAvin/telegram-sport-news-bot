@@ -2,6 +2,7 @@ name: Main Yamal
 
 on:
   workflow_dispatch:
+
   schedule:
     - cron: "*/30 * * * *"
 
@@ -18,6 +19,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v5
 
@@ -34,9 +36,10 @@ jobs:
       - name: Run bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHANNEL: ${{ secrets.CHANNEL }}
+          CHANNEL: ${{ secrets.CHANNEL_ID }}
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           PYTHONUNBUFFERED: "1"
+
         run: |
           set -o pipefail
 
@@ -67,11 +70,11 @@ jobs:
           echo "END BOT LOG"
           echo "========================================"
 
-      - name: Save news database
+      - name: Save bot database
         if: always()
         run: |
           echo "========================================"
-          echo "SAVING NEWS DATABASE"
+          echo "SAVING BOT DATABASE"
           echo "========================================"
 
           git config user.name "github-actions[bot]"
@@ -87,10 +90,15 @@ jobs:
             echo "last_run.json added."
           fi
 
+          if [ -f telegram_last_run.json ]; then
+            git add telegram_last_run.json
+            echo "telegram_last_run.json added."
+          fi
+
           if git diff --cached --quiet; then
             echo "No database changes to commit."
           else
-            git commit -m "Update news database"
+            git commit -m "Update bot database"
             git push
             echo "Database successfully saved to GitHub."
           fi
