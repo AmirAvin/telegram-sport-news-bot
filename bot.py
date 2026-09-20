@@ -40,13 +40,13 @@ USER_AGENT = (
 
 
 # ============================================================
-# TELEGRAM CHANNELS
+# TELEGRAM PUBLIC CHANNELS
 # ============================================================
 
 TELEGRAM_CHANNELS = [
     {
-        "username": "ft360_ir",
-        "name": "فوتبال ۳۶۰",
+        "username": "F0_TB",
+        "name": "فوتبال برتر",
     }
 ]
 
@@ -434,18 +434,7 @@ def create_hashtags(title, summary=""):
         f"{title} {summary}"
     )
 
-    result = []
-
-    # --------------------------------------------------------
-    # هشتگ اصلی فوتبال
-    # --------------------------------------------------------
-
-    if "#فوتبال" not in result:
-        result.append("#فوتبال")
-
-    # --------------------------------------------------------
-    # هشتگ‌های مشخص
-    # --------------------------------------------------------
+    result = ["#فوتبال"]
 
     for keyword, hashtag in HASHTAG_MAP.items():
 
@@ -457,10 +446,6 @@ def create_hashtags(title, summary=""):
 
             if hashtag not in result:
                 result.append(hashtag)
-
-    # --------------------------------------------------------
-    # هشتگ‌های عمومی
-    # --------------------------------------------------------
 
     extra_hashtags = [
         ("پنالتی", "#پنالتی"),
@@ -490,13 +475,7 @@ def create_hashtags(title, summary=""):
             if hashtag not in result:
                 result.append(hashtag)
 
-    # --------------------------------------------------------
-    # حداکثر 6 هشتگ
-    # --------------------------------------------------------
-
-    return " ".join(
-        result[:6]
-    )
+    return " ".join(result[:6])
 
 
 # ============================================================
@@ -625,7 +604,7 @@ def register_sent(news, sent):
 
 
 # ============================================================
-# LAST RUN
+# TIMESTAMPS
 # ============================================================
 
 def load_timestamp(filename):
@@ -978,13 +957,7 @@ def clean_telegram_text(text):
         strip=True
     )
 
-    text = html.unescape(
-        text
-    )
-
-    # --------------------------------------------------------
-    # حذف لینک‌ها
-    # --------------------------------------------------------
+    text = html.unescape(text)
 
     text = re.sub(
         r"https?://\S+",
@@ -1007,63 +980,6 @@ def clean_telegram_text(text):
         flags=re.IGNORECASE
     )
 
-    # --------------------------------------------------------
-    # حذف آیدی فوتبال ۳۶۰
-    # --------------------------------------------------------
-
-    text = re.sub(
-        r"@ft360_ir\b",
-        "",
-        text,
-        flags=re.IGNORECASE
-    )
-
-    # --------------------------------------------------------
-    # حذف تبلیغ فوتبال ۳۶۰
-    # --------------------------------------------------------
-
-    text = re.sub(
-        r"🔗?\s*"
-        r"هم\s*(?:‌|\s)?اکنون"
-        r"\s+در\s+"
-        r"(?:سایت|وب‌سایت|وب سایت)"
-        r"\s+و\s+"
-        r"(?:یوتوب|یوتیوب)"
-        r"\s+فوتبال\s*۳۶۰",
-        "",
-        text,
-        flags=re.IGNORECASE
-    )
-
-    text = re.sub(
-        r"🔗?\s*"
-        r"(?:در\s+)?"
-        r"(?:سایت|وب‌سایت|وب سایت)"
-        r"\s+و\s+"
-        r"(?:یوتوب|یوتیوب)"
-        r"\s+فوتبال\s*۳۶۰",
-        "",
-        text,
-        flags=re.IGNORECASE
-    )
-
-    text = re.sub(
-        r"🔗?\s*"
-        r"هم\s*(?:‌|\s)?اکنون"
-        r"\s+در\s+"
-        r"(?:سایت|وب‌سایت|وب سایت)"
-        r"\s+و\s+"
-        r"(?:یوتوب|یوتیوب)"
-        r"\s+فوتبال\s*[۳3]\s*۶\s*۰",
-        "",
-        text,
-        flags=re.IGNORECASE
-    )
-
-    # --------------------------------------------------------
-    # حذف خطوط تبلیغاتی احتمالی دیگر
-    # --------------------------------------------------------
-
     lines = []
 
     for line in text.splitlines():
@@ -1073,26 +989,6 @@ def clean_telegram_text(text):
         if not stripped:
             continue
 
-        normalized_line = normalize_title(
-            stripped
-        )
-
-        if (
-            "هم اکنون در سایت" in normalized_line
-            and "یوت" in normalized_line
-            and "فوتبال" in normalized_line
-        ):
-            continue
-
-        if (
-            "سایت و یوتوب فوتبال" in normalized_line
-            or "سایت و یوتیوب فوتبال" in normalized_line
-        ):
-            continue
-
-        if "@ft360_ir" in normalized_line:
-            continue
-
         lines.append(
             stripped
         )
@@ -1100,10 +996,6 @@ def clean_telegram_text(text):
     text = "\n".join(
         lines
     )
-
-    # --------------------------------------------------------
-    # تمیز کردن
-    # --------------------------------------------------------
 
     text = re.sub(
         r"[ \t]+",
@@ -1288,7 +1180,7 @@ def get_telegram_channel_news(username):
                 and not text
             ):
 
-                title = "ویدئوی فوتبال ۳۶۰"
+                title = "ویدئوی فوتبال"
                 body = ""
 
             results.append({
@@ -1868,10 +1760,6 @@ def process_rss_news(bot, sent):
         len(all_news)
     )
 
-    # --------------------------------------------------------
-    # FIRST RUN
-    # --------------------------------------------------------
-
     if last_run is None:
 
         print(
@@ -1915,10 +1803,6 @@ def process_rss_news(bot, sent):
 
         return
 
-    # --------------------------------------------------------
-    # FIND NEW NEWS
-    # --------------------------------------------------------
-
     new_news = []
 
     for news in all_news:
@@ -1948,10 +1832,6 @@ def process_rss_news(bot, sent):
         new_news
     )
 
-    # --------------------------------------------------------
-    # OLDEST FIRST
-    # --------------------------------------------------------
-
     new_news.sort(
         key=lambda x: x.get(
             "timestamp",
@@ -1976,10 +1856,6 @@ def process_rss_news(bot, sent):
     sent_count = 0
     last_success_timestamp = last_run
     send_failed = False
-
-    # --------------------------------------------------------
-    # SEND MAX 10
-    # --------------------------------------------------------
 
     for news in new_news[
         :MAX_NEWS_PER_RUN
@@ -2035,10 +1911,6 @@ def process_rss_news(bot, sent):
             send_failed = True
 
             break
-
-    # --------------------------------------------------------
-    # IF EVERYTHING WAS SENT
-    # --------------------------------------------------------
 
     if not send_failed:
 
@@ -2121,10 +1993,6 @@ def process_telegram_news(bot, sent):
             len(news)
         )
 
-    # --------------------------------------------------------
-    # FIRST RUN
-    # --------------------------------------------------------
-
     if last_run is None:
 
         print(
@@ -2168,10 +2036,6 @@ def process_telegram_news(bot, sent):
 
         return
 
-    # --------------------------------------------------------
-    # FIND NEW TELEGRAM POSTS
-    # --------------------------------------------------------
-
     new_news = []
 
     for news in all_news:
@@ -2201,10 +2065,6 @@ def process_telegram_news(bot, sent):
         new_news
     )
 
-    # --------------------------------------------------------
-    # OLDEST FIRST
-    # --------------------------------------------------------
-
     new_news.sort(
         key=lambda x: x.get(
             "timestamp",
@@ -2229,10 +2089,6 @@ def process_telegram_news(bot, sent):
     sent_count = 0
     last_success_timestamp = last_run
     send_failed = False
-
-    # --------------------------------------------------------
-    # SEND MAX 10
-    # --------------------------------------------------------
 
     for news in new_news[
         :MAX_NEWS_PER_RUN
@@ -2288,10 +2144,6 @@ def process_telegram_news(bot, sent):
             send_failed = True
 
             break
-
-    # --------------------------------------------------------
-    # IF EVERYTHING WAS SENT
-    # --------------------------------------------------------
 
     if not send_failed:
 
@@ -2406,6 +2258,7 @@ def main():
     print("=" * 50)
     print("FOOTBALL ONLY")
     print("RSS + TELEGRAM PUBLIC CHANNEL")
+    print("TELEGRAM SOURCE: @F0_TB")
     print("=" * 50)
 
     if not BOT_TOKEN:
@@ -2444,13 +2297,11 @@ def main():
 
     sent = load_sent()
 
-    # RSS
     process_rss_news(
         bot,
         sent
     )
 
-    # Telegram public channels
     process_telegram_news(
         bot,
         sent
@@ -2459,10 +2310,6 @@ def main():
     save_sent(
         sent
     )
-
-    # --------------------------------------------------------
-    # SHUTDOWN TELEGRAM CLEANLY
-    # --------------------------------------------------------
 
     try:
 
