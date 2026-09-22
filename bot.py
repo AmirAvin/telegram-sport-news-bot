@@ -346,12 +346,67 @@ def clean_text(text):
 
 
 def truncate(text, limit):
-    text = text or ""
+    """
+    کوتاه کردن متن بدون بریدن وسط جمله.
+    اولویت با پایان یک جمله کامل است.
+    """
+
+    text = clean_text(text)
+
+    if not text:
+        return ""
 
     if len(text) <= limit:
         return text
 
-    return text[:limit - 3].rstrip() + "..."
+    candidate = text[:limit].rstrip()
+
+    # پایان‌های رایج جمله
+    sentence_endings = r"[.!؟؛…]+"
+
+    matches = list(
+        re.finditer(
+            sentence_endings,
+            candidate
+        )
+    )
+
+    # اگر در محدوده، جمله کامل وجود دارد،
+    # آخرین جمله کامل را برمی‌گردانیم.
+    if matches:
+        last_end = matches[-1].end()
+        result = candidate[:last_end].strip()
+
+        if result:
+            return result
+
+    # اگر هیچ نقطه پایانی وجود نداشت،
+    # وسط کلمه قطع نکن.
+    words = candidate.rsplit(" ", 1)
+
+    if len(words) == 2:
+        result = words[0].strip()
+
+        if result:
+            return result + "..."
+
+    return candidate + "..."
+
+
+def clean_summary_for_message(text, limit):
+    """
+    خلاصه را تا حد ممکن به صورت جمله‌های کامل نگه می‌دارد.
+    """
+
+    text = clean_text(text)
+
+    if not text:
+        return ""
+
+    return truncate(
+        text,
+        limit
+    )
 
 
 def clean_url(url):
@@ -883,9 +938,11 @@ def get_article_text(url):
             text
         )
 
+        # اصلاح مهم:
+        # متن مقاله فقط تا انتهای یک جمله کامل کوتاه می‌شود.
         return truncate(
             text,
-            2500
+            1800
         )
 
     except Exception:
@@ -1243,12 +1300,14 @@ def build_caption(news):
 
     if summary:
 
+        clean_summary = truncate(
+            summary,
+            700
+        )
+
         parts.append(
             html.escape(
-                truncate(
-                    summary,
-                    750
-                )
+                clean_summary
             )
         )
 
@@ -1262,10 +1321,55 @@ def build_caption(news):
         "@ligebartar24"
     )
 
-    return truncate(
-        "\n\n".join(parts),
-        1024
-    )
+    caption = "\n\n".join(parts)
+
+    # اگر کپشن داخل محدودیت تلگرام باشد
+    if len(caption) <= 1024:
+        return caption
+
+    # در صورت طولانی شدن کپشن،
+    # فقط خلاصه را کوتاه می‌کنیم.
+    if summary:
+
+        short_summary = truncate(
+            summary,
+            550
+        )
+
+        parts = []
+
+        if title:
+            parts.append(
+                f"<b>{html.escape(title)}</b>"
+            )
+
+        if short_summary:
+            parts.append(
+                html.escape(
+                    short_summary
+                )
+            )
+
+        if hashtags:
+            parts.append(
+                hashtags
+            )
+
+        parts.append(
+            "@ligebartar24"
+        )
+
+        caption = "\n\n".join(parts)
+
+    # فقط به عنوان آخرین راه‌حل،
+    # در محدوده مجاز نگه می‌داریم.
+    if len(caption) > 1024:
+
+        # این حالت معمولاً فقط وقتی رخ می‌دهد
+        # که عنوان بسیار طولانی باشد.
+        caption = caption[:1021].rstrip() + "..."
+
+    return caption
 
 
 def build_text_message(news):
@@ -1299,12 +1403,14 @@ def build_text_message(news):
 
     if summary:
 
+        clean_summary = truncate(
+            summary,
+            3000
+        )
+
         parts.append(
             html.escape(
-                truncate(
-                    summary,
-                    3000
-                )
+                clean_summary
             )
         )
 
