@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import requests
@@ -30,12 +31,13 @@ HEADERS = {
     )
 }
 
-MAX_CAPTION_LENGTH = 1024
 MAX_POSTS_PER_RUN = 20
+MAX_CAPTION_LENGTH = 1024
+MAX_MESSAGE_LENGTH = 4096
 
 
 # ==========================================
-# STATE MANAGEMENT
+# STATE
 # ==========================================
 
 def load_last_post_id():
@@ -43,18 +45,18 @@ def load_last_post_id():
         return None
 
     try:
-        data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        data = json.loads(
+            STATE_FILE.read_text(encoding="utf-8")
+        )
 
         if isinstance(data, dict):
             value = data.get(
                 "last_post_id",
                 data.get("last_id")
             )
-        else:
-            value = None
 
-        if value is not None:
-            return int(value)
+            if value is not None:
+                return int(value)
 
     except Exception as error:
         print("STATE READ ERROR:", repr(error))
@@ -63,22 +65,22 @@ def load_last_post_id():
 
 
 def save_last_post_id(post_id):
-    data = {
-        "last_post_id": int(post_id)
-    }
-
     STATE_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
+        json.dumps(
+            {"last_post_id": int(post_id)},
+            ensure_ascii=False,
+            indent=2
+        ),
         encoding="utf-8"
     )
 
 
 # ==========================================
-# TELEGRAM SOURCE
+# READ SOURCE CHANNEL
 # ==========================================
 
 def get_source_posts():
-    print("Reading source channel:", SOURCE_CHANNEL)
+    print("Reading source:", SOURCE_CHANNEL)
 
     response = requests.get(
         SOURCE_URL,
@@ -87,11 +89,9 @@ def get_source_posts():
     )
 
     print("SOURCE HTTP STATUS:", response.status_code)
-
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
-
     posts = []
 
     for message in soup.select(".tgme_widget_message"):
@@ -115,6 +115,7 @@ def get_source_posts():
             else ""
         )
 
+        # Find videos
         video_urls = []
 
         for video in message.select("video"):
@@ -129,13 +130,34 @@ def get_source_posts():
                 if src and src.startswith("http"):
                     video_urls.append(src)
 
-        # Remove duplicate video URLs while preserving order.
         video_urls = list(dict.fromkeys(video_urls))
+
+        # Find photos
+        photo_urls = []
+
+        for photo in message.select(
+            ".tgme_widget_message_photo_wrap"
+        ):
+            style = photo.get("style", "")
+
+            match = re.search(
+                r"""url\(['"]?(.*?)['"]?\)""",
+                style
+            )
+
+            if match:
+                photo_url = match.group(1).strip()
+
+                if photo_url.startswith("http"):
+                    photo_urls.append(photo_url)
+
+        photo_urls = list(dict.fromkeys(photo_urls))
 
         posts.append({
             "id": post_id,
             "text": post_text,
             "video_urls": video_urls,
+            "photo_urls": photo_urls,
         })
 
     posts.sort(key=lambda item: item["id"])
@@ -146,98 +168,136 @@ def get_source_posts():
 
 
 # ==========================================
-# VIDEO DOWNLOAD
+# DOWNLOAD MEDIA
 # ==========================================
 
-def download_video(video_url):
-    print("Downloading video...")
-
-    response = requests.get(
-        video_url,
-        headers=HEADERS,
-        timeout=120,
-        stream=True
-    )
-
-    if response.status_code != 200:
-        print("VIDEO DOWNLOAD FAILED:", response.status_code)
-        response.close()
-        return None
-
-    content_type = response.headers.get(
-        "Content-Type",
-        ""
-    ).lower()
-
-    if "video" not in content_type and ".mp4" not in video_url.lower():
-        print("NOT A VIDEO:", content_type)
-        response.close()
-        return None
-
-    video_data = bytearray()
-
+def download_media(url):
     try:
-        for chunk in response.iter_content(chunk_size=1024 * 1024):
-            if chunk:
-                video_data.extend(chunk)
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=120
+        )
+
+        if response.status_code != 200:
+            print("MEDIA DOWNLOAD FAILED:", response.status_code)
+            return None
+
+        if not response.content:
+            print("MEDIA FILE EMPTY")
+            return None
+
+        return response.content
 
     except Exception as error:
-        print("VIDEO DOWNLOAD ERROR:", repr(error))
-        response.close()
+        print("MEDIA DOWNLOAD ERROR:", repr(error))
         return None
-
-    finally:
-        response.close()
-
-    if not video_data:
-        print("VIDEO FILE IS EMPTY")
-        return None
-
-    print("VIDEO DOWNLOADED:", len(video_data), "bytes")
-
-    return bytes(video_data)
 
 
 # ==========================================
-# CAPTION
+# CAPTIONS AND TEXT
 # ==========================================
 
 def build_caption(post_text):
     suffix = f"{HASHTAGS}\n\n{SIGNATURE}"
+    text = (post_text or "").strip()
 
-    if not post_text:
-        return suffix
+    available = MAX_CAPTION_LENGTH - len(suffix) - 2
 
-    available_length = (
-        MAX_CAPTION_LENGTH - len(suffix) - 2
-    )
+    if len(text) > available:
+        text = text[:available - 1].rstrip() + "…"
 
-    text = post_text.strip()
+    if text:
+        return f"{text}\n\n{suffix}"
 
-    if len(text) > available_length:
-        text = text[:available_length - 1].rstrip() + "…"
+    return suffix
 
-    return f"{text}\n\n{suffix}"
+
+def build_text(post_text):
+    suffix = f"{HASHTAGS}\n\n{SIGNATURE}"
+    text = (post_text or "").strip()
+
+    available = MAX_MESSAGE_LENGTH - len(suffix) - 2
+
+    if len(text) > available:
+        text = text[:available - 1].rstrip() + "…"
+
+    if text:
+        return f"{text}\n\n{suffix}"
+
+    return suffix
 
 
 # ==========================================
-# SEND VIDEO TO DESTINATION
+# TELEGRAM API
 # ==========================================
 
-def send_video(video_data, caption):
+def telegram_request(method, data=None, files=None):
     if not BOT_TOKEN:
-        raise RuntimeError(
-            "BOT_TOKEN is missing from GitHub Secrets."
+        print("ERROR: BOT_TOKEN is missing.")
+        return False
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+
+    try:
+        response = requests.post(
+            url,
+            data=data,
+            files=files,
+            timeout=180
         )
 
-    api_url = (
-        f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo"
+        try:
+            result = response.json()
+        except ValueError:
+            print("INVALID TELEGRAM RESPONSE:", response.text[:300])
+            return False
+
+        if response.status_code == 200 and result.get("ok"):
+            print("TELEGRAM SEND SUCCESS:", method)
+            return True
+
+        print(
+            "TELEGRAM SEND FAILED:",
+            json.dumps(result, ensure_ascii=False)
+        )
+
+    except Exception as error:
+        print("TELEGRAM API ERROR:", repr(error))
+
+    return False
+
+
+def send_text(text):
+    return telegram_request(
+        "sendMessage",
+        data={
+            "chat_id": DESTINATION,
+            "text": text,
+        }
     )
 
-    print("Sending video to:", DESTINATION)
 
-    response = requests.post(
-        api_url,
+def send_photo(photo_data, caption):
+    return telegram_request(
+        "sendPhoto",
+        data={
+            "chat_id": DESTINATION,
+            "caption": caption,
+        },
+        files={
+            "photo": (
+                "football_photo.jpg",
+                photo_data,
+                "image/jpeg"
+            )
+        }
+    )
+
+
+def send_video(video_data, caption):
+    return telegram_request(
+        "sendVideo",
         data={
             "chat_id": DESTINATION,
             "caption": caption,
@@ -249,36 +309,20 @@ def send_video(video_data, caption):
                 video_data,
                 "video/mp4"
             )
-        },
-        timeout=180
+        }
     )
-
-    try:
-        result = response.json()
-    except ValueError:
-        print("TELEGRAM RESPONSE:", response.text[:500])
-        return False
-
-    if response.status_code == 200 and result.get("ok"):
-        print("VIDEO SENT SUCCESSFULLY")
-        return True
-
-    print("TELEGRAM SEND FAILED:")
-    print(json.dumps(result, ensure_ascii=False))
-
-    return False
 
 
 # ==========================================
-# MAIN PROCESS
+# PROCESS POSTS
 # ==========================================
 
 def main():
-    print("=" * 45)
-    print("FOOTBALL VIDEO BOT STARTED")
+    print("=" * 40)
+    print("FOOTBALL NEWS BOT STARTED")
     print("SOURCE:", SOURCE_CHANNEL)
     print("DESTINATION:", DESTINATION)
-    print("=" * 45)
+    print("=" * 40)
 
     if not BOT_TOKEN:
         print("ERROR: BOT_TOKEN is missing.")
@@ -296,16 +340,15 @@ def main():
 
     last_post_id = load_last_post_id()
 
-    # First run: save the newest post ID without forwarding
-    # old posts. This prevents a flood of historical videos.
+    # First run: save the latest post ID.
+    # Do not send old posts.
     if last_post_id is None:
         newest_id = max(post["id"] for post in posts)
-
         save_last_post_id(newest_id)
 
         print("FIRST RUN: BASELINE SAVED")
         print("LAST POST ID:", newest_id)
-        print("No old posts were forwarded.")
+        print("Old posts were not sent.")
         return
 
     new_posts = [
@@ -327,50 +370,54 @@ def main():
         print("-" * 40)
         print("PROCESSING POST:", post_id)
 
-        video_urls = post["video_urls"]
+        caption = build_caption(post["text"])
+        text = build_text(post["text"])
 
-        # Skip posts without video.
-        if not video_urls:
-            print("SKIPPED: No video in this post.")
+        success = False
 
+        # Video post
+        if post["video_urls"]:
+            for video_url in post["video_urls"]:
+                media = download_media(video_url)
+
+                if media:
+                    success = send_video(media, caption)
+                    break
+
+        # Photo post
+        elif post["photo_urls"]:
+            for photo_url in post["photo_urls"]:
+                media = download_media(photo_url)
+
+                if media:
+                    success = send_photo(media, caption)
+                    break
+
+        # Text-only post
+        elif post["text"].strip():
+            success = send_text(text)
+
+        else:
+            print("SKIPPED: No readable text or supported media.")
             save_last_post_id(post_id)
             last_post_id = post_id
             continue
 
-        video_data = None
-
-        # Try each video URL until one downloads successfully.
-        for video_url in video_urls:
-            video_data = download_video(video_url)
-
-            if video_data:
-                break
-
-        # If a video exists but cannot be downloaded,
-        # stop here so this post can be retried next run.
-        if not video_data:
-            print("STOPPED: Video could not be downloaded.")
-            break
-
-        caption = build_caption(post["text"])
-
-        success = send_video(video_data, caption)
-
+        # Do not mark a post as processed if sending failed.
         if not success:
-            print("STOPPED: Telegram did not accept the video.")
+            print("STOPPED: Post was not sent:", post_id)
             break
 
-        # Save progress after each processed post.
         save_last_post_id(post_id)
         last_post_id = post_id
 
-        print("POST COMPLETED:", post_id)
+        print("POST SENT SUCCESSFULLY:", post_id)
 
         time.sleep(2)
 
-    print("=" * 45)
+    print("=" * 40)
     print("BOT FINISHED")
-    print("=" * 45)
+    print("=" * 40)
 
 
 if __name__ == "__main__":
