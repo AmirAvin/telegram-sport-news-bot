@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 CHANNEL = "F0_TB"
 POST_ID = "141223"
 
-URL = f"https://t.me/s/{CHANNEL}/{POST_ID}"
+POST_URL = f"https://t.me/s/{CHANNEL}/{POST_ID}"
 
 HEADERS = {
     "User-Agent": (
@@ -21,9 +21,9 @@ def main():
 
     try:
         response = requests.get(
-            URL,
+            POST_URL,
             headers=HEADERS,
-            timeout=30,
+            timeout=30
         )
 
         print("PAGE STATUS:", response.status_code)
@@ -32,10 +32,7 @@ def main():
             print("RESULT: PAGE FAILED")
             return
 
-        soup = BeautifulSoup(
-            response.text,
-            "html.parser",
-        )
+        soup = BeautifulSoup(response.text, "html.parser")
 
         target = None
 
@@ -87,39 +84,32 @@ def main():
         for index, video_url in enumerate(video_urls, 1):
             print(f"TESTING VIDEO {index}")
 
-            try:
-                video_response = requests.get(
-                    video_url,
-                    headers=HEADERS,
-                    stream=True,
-                    timeout=30,
-                    headers_extra=None,
-                )
-            except TypeError:
-                video_response = requests.get(
-                    video_url,
-                    headers=HEADERS,
-                    stream=True,
-                    timeout=30,
-                )
+            video_response = requests.get(
+                video_url,
+                headers=HEADERS,
+                stream=True,
+                timeout=30
+            )
 
-            print("VIDEO HTTP STATUS:", video_response.status_code)
-            print(
-                "CONTENT TYPE:",
-                video_response.headers.get("Content-Type", "unknown")
+            status = video_response.status_code
+            content_type = video_response.headers.get(
+                "Content-Type",
+                "unknown"
             )
-            print(
-                "CONTENT LENGTH:",
-                video_response.headers.get("Content-Length", "unknown")
+            content_length = video_response.headers.get(
+                "Content-Length",
+                "unknown"
             )
+
+            print("VIDEO HTTP STATUS:", status)
+            print("CONTENT TYPE:", content_type)
+            print("CONTENT LENGTH:", content_length)
 
             video_response.close()
 
-            if (
-                video_response.status_code == 200
-                and "video" in video_response.headers.get(
-                    "Content-Type", ""
-                ).lower()
+            if status == 200 and (
+                "video" in content_type.lower()
+                or ".mp4" in video_url.lower()
             ):
                 print("RESULT: VIDEO DOWNLOAD ACCESS CONFIRMED")
                 return
