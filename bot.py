@@ -23,6 +23,11 @@ STATE_FILE = Path("telegram_last_run.json")
 HASHTAGS = "#فوتبال #گل"
 SIGNATURE = "⚽️ @ligebartar24"
 
+# Username to remove from source posts
+REMOVE_USERNAMES = [
+    "@Footballirib3",
+]
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -37,7 +42,34 @@ MAX_MESSAGE_LENGTH = 4096
 
 
 # ==========================================
-# STATE
+# CLEAN SOURCE TEXT
+# ==========================================
+
+def clean_text(text):
+    text = (text or "").strip()
+
+    # Remove unwanted source usernames
+    for username in REMOVE_USERNAMES:
+        text = re.sub(
+            re.escape(username),
+            "",
+            text,
+            flags=re.IGNORECASE
+        )
+
+    # Remove excessive blank lines
+    text = re.sub(r"\n[ \t]*\n(?:[ \t]*\n)+", "\n\n", text)
+
+    # Remove spaces at the beginning and end of lines
+    text = "\n".join(
+        line.strip() for line in text.splitlines()
+    )
+
+    return text.strip()
+
+
+# ==========================================
+# STATE MANAGEMENT
 # ==========================================
 
 def load_last_post_id():
@@ -109,13 +141,15 @@ def get_source_posts():
             ".tgme_widget_message_text"
         )
 
-        post_text = (
+        raw_text = (
             text_element.get_text("\n", strip=True)
             if text_element
             else ""
         )
 
-        # Find videos
+        post_text = clean_text(raw_text)
+
+        # Find video URLs
         video_urls = []
 
         for video in message.select("video"):
@@ -132,7 +166,7 @@ def get_source_posts():
 
         video_urls = list(dict.fromkeys(video_urls))
 
-        # Find photos
+        # Find photo URLs
         photo_urls = []
 
         for photo in message.select(
@@ -180,7 +214,10 @@ def download_media(url):
         )
 
         if response.status_code != 200:
-            print("MEDIA DOWNLOAD FAILED:", response.status_code)
+            print(
+                "MEDIA DOWNLOAD FAILED:",
+                response.status_code
+            )
             return None
 
         if not response.content:
@@ -195,13 +232,13 @@ def download_media(url):
 
 
 # ==========================================
-# CAPTIONS AND TEXT
+# BUILD CAPTION
 # ==========================================
 
 def build_caption(post_text):
-    suffix = f"{HASHTAGS}\n\n{SIGNATURE}"
-    text = (post_text or "").strip()
+    text = clean_text(post_text)
 
+    suffix = f"{HASHTAGS}\n\n{SIGNATURE}"
     available = MAX_CAPTION_LENGTH - len(suffix) - 2
 
     if len(text) > available:
@@ -213,10 +250,14 @@ def build_caption(post_text):
     return suffix
 
 
-def build_text(post_text):
-    suffix = f"{HASHTAGS}\n\n{SIGNATURE}"
-    text = (post_text or "").strip()
+# ==========================================
+# BUILD TEXT MESSAGE
+# ==========================================
 
+def build_text(post_text):
+    text = clean_text(post_text)
+
+    suffix = f"{HASHTAGS}\n\n{SIGNATURE}"
     available = MAX_MESSAGE_LENGTH - len(suffix) - 2
 
     if len(text) > available:
@@ -237,7 +278,9 @@ def telegram_request(method, data=None, files=None):
         print("ERROR: BOT_TOKEN is missing.")
         return False
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+    url = (
+        f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+    )
 
     try:
         response = requests.post(
@@ -250,7 +293,10 @@ def telegram_request(method, data=None, files=None):
         try:
             result = response.json()
         except ValueError:
-            print("INVALID TELEGRAM RESPONSE:", response.text[:300])
+            print(
+                "INVALID TELEGRAM RESPONSE:",
+                response.text[:300]
+            )
             return False
 
         if response.status_code == 200 and result.get("ok"):
@@ -340,10 +386,11 @@ def main():
 
     last_post_id = load_last_post_id()
 
-    # First run: save the latest post ID.
-    # Do not send old posts.
+    # First run: establish a baseline.
+    # Do not forward historical posts.
     if last_post_id is None:
         newest_id = max(post["id"] for post in posts)
+
         save_last_post_id(newest_id)
 
         print("FIRST RUN: BASELINE SAVED")
@@ -370,8 +417,10 @@ def main():
         print("-" * 40)
         print("PROCESSING POST:", post_id)
 
-        caption = build_caption(post["text"])
-        text = build_text(post["text"])
+        post_text = clean_text(post["text"])
+
+        caption = build_caption(post_text)
+        text = build_text(post_text)
 
         success = False
 
@@ -394,7 +443,7 @@ def main():
                     break
 
         # Text-only post
-        elif post["text"].strip():
+        elif post_text:
             success = send_text(text)
 
         else:
@@ -403,7 +452,7 @@ def main():
             last_post_id = post_id
             continue
 
-        # Do not mark a post as processed if sending failed.
+        # If sending fails, do not advance the saved ID.
         if not success:
             print("STOPPED: Post was not sent:", post_id)
             break
