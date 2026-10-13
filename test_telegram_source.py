@@ -1,7 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 
-POST_URL = "https://t.me/s/F0_TB/141223"
+CHANNEL = "F0_TB"
+POST_ID = "141223"
+
+URL = f"https://t.me/s/{CHANNEL}/{POST_ID}"
 
 HEADERS = {
     "User-Agent": (
@@ -13,20 +16,20 @@ HEADERS = {
 
 
 def main():
-    print("Checking public Telegram post...")
-    print("Post:", POST_URL)
+    print("CHECKING SPECIFIC TELEGRAM POST")
+    print("POST:", f"https://t.me/{CHANNEL}/{POST_ID}")
 
     try:
         response = requests.get(
-            POST_URL,
+            URL,
             headers=HEADERS,
             timeout=30,
         )
 
-        print("HTTP STATUS:", response.status_code)
+        print("PAGE STATUS:", response.status_code)
 
         if response.status_code != 200:
-            print("RESULT: Public post could not be loaded.")
+            print("RESULT: PAGE FAILED")
             return
 
         soup = BeautifulSoup(
@@ -34,52 +37,94 @@ def main():
             "html.parser",
         )
 
-        messages = soup.select(
-            ".tgme_widget_message"
+        target = None
+
+        for message in soup.select(".tgme_widget_message"):
+            post_ref = message.get("data-post", "")
+
+            if post_ref == f"{CHANNEL}/{POST_ID}":
+                target = message
+                break
+
+        if target is None:
+            print("RESULT: TARGET POST NOT FOUND IN PAGE")
+            print("The post may not be included in this preview.")
+            return
+
+        text_element = target.select_one(
+            ".tgme_widget_message_text"
         )
 
-        print("MESSAGES FOUND:", len(messages))
-
-        video_elements = soup.select(
-            ".tgme_widget_message_video"
+        post_text = (
+            text_element.get_text(" ", strip=True)
+            if text_element
+            else ""
         )
 
-        print("VIDEO ELEMENTS:", len(video_elements))
+        print("POST TEXT FOUND:", bool(post_text))
+        print("TEXT LENGTH:", len(post_text))
 
-        video_sources = soup.select("video source")
-        videos = soup.select("video")
+        video_urls = set()
 
-        print("VIDEO TAGS:", len(videos))
-        print("VIDEO SOURCES:", len(video_sources))
+        for video in target.select("video"):
+            src = video.get("src")
 
-        direct_urls = set()
-
-        for element in video_sources:
-            src = element.get("src")
             if src and src.startswith("http"):
-                direct_urls.add(src)
+                video_urls.add(src)
 
-        for element in videos:
-            src = element.get("src")
-            if src and src.startswith("http"):
-                direct_urls.add(src)
+            for source in video.select("source"):
+                src = source.get("src")
 
-        print("DIRECT VIDEO URLS:", len(direct_urls))
+                if src and src.startswith("http"):
+                    video_urls.add(src)
 
-        for url in direct_urls:
-            print("VIDEO URL:", url[:200])
+        print("VIDEO URLS FOUND:", len(video_urls))
 
-        if direct_urls:
-            print("RESULT: A possible direct video URL was found.")
-        elif video_elements:
+        if not video_urls:
+            print("RESULT: NO DIRECT VIDEO URL FOR THIS POST")
+            return
+
+        for index, video_url in enumerate(video_urls, 1):
+            print(f"TESTING VIDEO {index}")
+
+            try:
+                video_response = requests.get(
+                    video_url,
+                    headers=HEADERS,
+                    stream=True,
+                    timeout=30,
+                    headers_extra=None,
+                )
+            except TypeError:
+                video_response = requests.get(
+                    video_url,
+                    headers=HEADERS,
+                    stream=True,
+                    timeout=30,
+                )
+
+            print("VIDEO HTTP STATUS:", video_response.status_code)
             print(
-                "RESULT: Video is indicated in the page, "
-                "but no direct video URL was found."
+                "CONTENT TYPE:",
+                video_response.headers.get("Content-Type", "unknown")
             )
-        else:
             print(
-                "RESULT: No accessible video element was found."
+                "CONTENT LENGTH:",
+                video_response.headers.get("Content-Length", "unknown")
             )
+
+            video_response.close()
+
+            if (
+                video_response.status_code == 200
+                and "video" in video_response.headers.get(
+                    "Content-Type", ""
+                ).lower()
+            ):
+                print("RESULT: VIDEO DOWNLOAD ACCESS CONFIRMED")
+                return
+
+        print("RESULT: VIDEO DOWNLOAD NOT CONFIRMED")
 
     except Exception as error:
         print("ERROR:", repr(error))
